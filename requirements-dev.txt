@@ -1,0 +1,12 @@
+# FWT Re-Patched - development and quality dependencies
+# Install with: python -m pip install -r requirements-dev.txt
+-r requirements.txt
+
+pytest==9.2.0
+pytest-cov==7.1.0
+pytest-timeout==2.4.0
+ruff==0.17.5
+mypy==2.4.1
+hypothesis==6.170.15
+pre-commit==4.7.0
+pip-audit==2.10.1

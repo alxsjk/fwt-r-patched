@@ -1,0 +1,51 @@
+name: Feature / Patch Proposal
+description: Propose a new patch option, enhancement, or documentation improvement before writing code.
+title: "[Proposal]: "
+labels: ["enhancement", "proposal", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository follows an **issue-first workflow**: non-trivial features and patches must be discussed and approved by the maintainer (`@alxsjk`) with the `approved` label before opening a Pull Request.
+        **Do not include copyrighted binaries, game dumps, `.env` keys, or large disassembly blocks.**
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Concise description of the feature, patch, or improvement.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Affected Components
+      multiple: true
+      options:
+        - Embedded local server (`libfwt_local_server.so`)
+        - Unity client datatables / assets
+        - DEX / Smali (`classes8.dex`)
+        - CLI (`fwt_patcher.py`)
+        - Desktop GUI (`gui/`)
+        - Inspector / Tests / Docs
+    validations:
+      required: true
+
+  - type: textarea
+    id: design
+    attributes:
+      label: Proposed Approach & Acceptance Criteria
+      description: Explain how it works and how correctness can be verified deterministically.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: agreement
+    attributes:
+      label: Maintainer Workflow Agreement
+      options:
+        - label: I understand PRs for non-trivial changes require prior maintainer approval on this issue.
+          required: true
+        - label: This proposal contains no proprietary game files, secrets, or personal data.
+          required: true

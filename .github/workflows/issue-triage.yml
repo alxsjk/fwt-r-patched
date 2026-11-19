@@ -1,0 +1,140 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  triage:
+    name: Triage New Issue
+    if: github.event.issue.user.login != 'alxsjk'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Apply needs-triage label and post authorial workflow guidance
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          MAINTAINER: alxsjk
+          TRIAGE_LABEL: needs-triage
+          APPROVED_LABEL: approved
+        run: |
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from collections.abc import Callable
+          from typing import Any
+
+          MARKER = "<!-- fwt-issue-triage -->"
+
+
+          def api_request(
+              token: str, method: str, path: str, payload: dict[str, Any] | None = None
+          ) -> tuple[int, Any]:
+              url = f"https://api.github.com{path}"
+              data = json.dumps(payload).encode("utf-8") if payload is not None else None
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "fwt-issue-triage",
+              }
+              if token:
+                  headers["Authorization"] = f"Bearer {token}"
+              if data is not None:
+                  headers["Content-Type"] = "application/json"
+              req = urllib.request.Request(url, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as resp:
+                      raw = resp.read().decode("utf-8")
+                      return resp.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as exc:
+                  return exc.code, None
+
+
+          def triage_issue(
+              repo: str,
+              issue_number: int,
+              issue_author: str,
+              api_fn: Callable[[str, str, dict[str, Any] | None], tuple[int, Any]],
+              *,
+              maintainer: str = "alxsjk",
+              triage_label: str = "needs-triage",
+              approved_label: str = "approved",
+          ) -> None:
+              status, issue_data = api_fn("GET", f"/repos/{repo}/issues/{issue_number}", None)
+              if status == 200 and isinstance(issue_data, dict):
+                  labels = [
+                      str(lbl.get("name") or "").lower()
+                      for lbl in (issue_data.get("labels") or [])
+                      if isinstance(lbl, dict)
+                  ]
+                  if triage_label.lower() not in labels:
+                      api_fn(
+                          "POST",
+                          f"/repos/{repo}/issues/{issue_number}/labels",
+                          {"labels": [triage_label]},
+                      )
+
+              _, comments = api_fn(
+                  "GET", f"/repos/{repo}/issues/{issue_number}/comments?per_page=100", None
+              )
+              if isinstance(comments, list) and any(
+                  isinstance(item, dict) and MARKER in str(item.get("body") or "")
+                  for item in comments
+              ):
+                  return
+
+              comment_body = (
+                  f"{MARKER}\n"
+                  f"Thank you for opening an issue on **FWT Reborn Patch**, @{issue_author}.\n\n"
+                  f"This project follows a maintainer-controlled **authorial / issue-first** workflow "
+                  f"(`@{maintainer}` is the sole code owner):\n"
+                  f"- Your issue has been marked `{triage_label}` for maintainer review.\n"
+                  f"- If you plan to submit a Pull Request, please wait until `@{maintainer}` reviews "
+                  f"the proposal and applies the `{approved_label}` label — external PRs without a linked "
+                  "open approved issue are blocked by the required **`PR Policy (Approved Issue)`** check.\n"
+                  "- Reminder: never attach or paste copyrighted game binaries (`.apk`, `.so`, `.dex`, `.dat`), "
+                  "save files, `.env` cipher keys, or personal IPs/paths.\n"
+              )
+              api_fn(
+                  "POST",
+                  f"/repos/{repo}/issues/{issue_number}/comments",
+                  {"body": comment_body},
+              )
+
+
+          def main() -> int:
+              repo = os.environ.get("REPO", "")
+              token = os.environ.get("GH_TOKEN", "")
+              issue_number = int(os.environ.get("ISSUE_NUMBER", "0"))
+              issue_author = os.environ.get("ISSUE_AUTHOR", "")
+              maintainer = os.environ.get("MAINTAINER", "alxsjk")
+              triage_label = os.environ.get("TRIAGE_LABEL", "needs-triage")
+              approved_label = os.environ.get("APPROVED_LABEL", "approved")
+
+              if not repo or issue_number <= 0:
+                  return 0
+
+              triage_issue(
+                  repo,
+                  issue_number,
+                  issue_author,
+                  lambda method, path, payload: api_request(token, method, path, payload),
+                  maintainer=maintainer,
+                  triage_label=triage_label,
+                  approved_label=approved_label,
+              )
+              return 0
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY

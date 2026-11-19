@@ -1,0 +1,233 @@
+name: PR Policy Comment
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: PR Policy Feedback
+    if: github.event.pull_request.user.login != 'alxsjk'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Post or update PR policy feedback comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          MAINTAINER: alxsjk
+          REQUIRED_LABEL: approved
+        run: |
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+          from collections.abc import Callable
+          from typing import Any
+
+          MARKER = "<!-- fwt-pr-policy-gate -->"
+
+
+          def extract_issue_numbers(body: str, repo: str) -> list[int]:
+              cleaned = re.sub(r"<!--.*?-->", " ", body or "", flags=re.S)
+              pattern = re.compile(
+                  rf"https?://github\.com/{re.escape(repo)}/issues/(?P<url>\d+)\b"
+                  r"|(?:^|[\s(\[/:])#(?P<short>\d+)\b"
+              )
+              numbers: list[int] = []
+              seen: set[int] = set()
+              for match in pattern.finditer(cleaned):
+                  raw = match.group("url") or match.group("short")
+                  if not raw:
+                      continue
+                  num = int(raw)
+                  if num > 0 and num not in seen:
+                      seen.add(num)
+                      numbers.append(num)
+                      if len(numbers) >= 10:
+                          break
+              return numbers
+
+
+          def evaluate_pr_policy(
+              author: str,
+              body: str,
+              repo: str,
+              fetch_issue: Callable[[int], tuple[int, dict[str, Any] | None]],
+              *,
+              maintainer: str = "alxsjk",
+              required_label: str = "approved",
+          ) -> tuple[bool, str]:
+              if author.strip().lower() == maintainer.strip().lower():
+                  return True, f"Maintainer PR (@{maintainer}) - policy check passed."
+
+              numbers = extract_issue_numbers(body, repo)
+              if not numbers:
+                  return (
+                      False,
+                      "No linked issue found in the PR description. "
+                      f"Reference an open issue approved by @{maintainer} "
+                      f"(carrying the `{required_label}` label), for example `Closes #123`.",
+                  )
+
+              reasons: list[str] = []
+              for num in numbers:
+                  status, data = fetch_issue(num)
+                  if status != 200 or not isinstance(data, dict):
+                      reasons.append(f"#{num} not found (HTTP {status})")
+                      continue
+                  if "pull_request" in data:
+                      reasons.append(f"#{num} is a pull request, not an issue")
+                      continue
+                  state = str(data.get("state") or "")
+                  if state != "open":
+                      reasons.append(f"#{num} is {state or 'closed'}")
+                      continue
+                  labels = [
+                      str(lbl.get("name") or "").lower()
+                      for lbl in (data.get("labels") or [])
+                      if isinstance(lbl, dict)
+                  ]
+                  if required_label.lower() not in labels:
+                      reasons.append(f"#{num} is missing maintainer label `{required_label}`")
+                      continue
+                  return True, f"Approved open issue #{num} verified."
+
+              return False, "No referenced issue qualifies: " + "; ".join(reasons) + "."
+
+
+          def api_request(
+              token: str, method: str, path: str, payload: dict[str, Any] | None = None
+          ) -> tuple[int, Any]:
+              url = f"https://api.github.com{path}"
+              data = json.dumps(payload).encode("utf-8") if payload is not None else None
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "fwt-pr-policy-comment",
+              }
+              if token:
+                  headers["Authorization"] = f"Bearer {token}"
+              if data is not None:
+                  headers["Content-Type"] = "application/json"
+              req = urllib.request.Request(url, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as resp:
+                      raw = resp.read().decode("utf-8")
+                      return resp.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as exc:
+                  return exc.code, None
+
+
+          def sync_pr_comment(
+              repo: str,
+              pr_number: int,
+              author: str,
+              body: str,
+              api_fn: Callable[[str, str, dict[str, Any] | None], tuple[int, Any]],
+              *,
+              maintainer: str = "alxsjk",
+              required_label: str = "approved",
+          ) -> None:
+              def fetch_issue(num: int) -> tuple[int, dict[str, Any] | None]:
+                  status, data = api_fn("GET", f"/repos/{repo}/issues/{num}", None)
+                  return status, data if isinstance(data, dict) else None
+
+              ok, reason = evaluate_pr_policy(
+                  author,
+                  body,
+                  repo,
+                  fetch_issue,
+                  maintainer=maintainer,
+                  required_label=required_label,
+              )
+
+              _, comments = api_fn(
+                  "GET", f"/repos/{repo}/issues/{pr_number}/comments?per_page=100", None
+              )
+              existing_id: int | None = None
+              if isinstance(comments, list):
+                  for item in comments:
+                      if isinstance(item, dict) and MARKER in str(item.get("body") or ""):
+                          existing_id = int(item["id"])
+                          break
+
+              if ok:
+                  if existing_id is None:
+                      return
+                  comment_body = (
+                      f"{MARKER}\n"
+                      f"✅ {reason} — PR policy check passed. "
+                      f"Waiting for @{maintainer} review and CI."
+                  )
+                  api_fn(
+                      "PATCH",
+                      f"/repos/{repo}/issues/comments/{existing_id}",
+                      {"body": comment_body},
+                  )
+                  return
+
+              comment_body = (
+                  f"{MARKER}\n"
+                  f"Hi @{author}, thank you for contributing to **FWT Reborn Patch**.\n\n"
+                  f"This repository is strictly maintainer-controlled (authorial / issue-first model owned by `@{maintainer}`). "
+                  "External Pull Requests are kept open for review, but merging is blocked by the required "
+                  "**`PR Policy (Approved Issue)`** check until an approved issue is linked:\n\n"
+                  f"- **Current status:** {reason}\n\n"
+                  "### How to unblock this PR\n"
+                  "1. Open an issue using the repository templates describing the proposed change.\n"
+                  f"2. Wait for `@{maintainer}` to review and apply the `{required_label}` label.\n"
+                  "3. Reference that open issue in this PR description (for example `Closes #123`) and update the PR.\n"
+              )
+              if existing_id is not None:
+                  api_fn(
+                      "PATCH",
+                      f"/repos/{repo}/issues/comments/{existing_id}",
+                      {"body": comment_body},
+                  )
+              else:
+                  api_fn(
+                      "POST",
+                      f"/repos/{repo}/issues/{pr_number}/comments",
+                      {"body": comment_body},
+                  )
+
+
+          def main() -> int:
+              repo = os.environ.get("REPO", "")
+              token = os.environ.get("GH_TOKEN", "")
+              author = os.environ.get("PR_AUTHOR", "")
+              pr_number = int(os.environ.get("PR_NUMBER", "0"))
+              body = os.environ.get("PR_BODY", "")
+              maintainer = os.environ.get("MAINTAINER", "alxsjk")
+              required_label = os.environ.get("REQUIRED_LABEL", "approved")
+
+              if not repo or pr_number <= 0:
+                  return 0
+
+              sync_pr_comment(
+                  repo,
+                  pr_number,
+                  author,
+                  body,
+                  lambda method, path, payload: api_request(token, method, path, payload),
+                  maintainer=maintainer,
+                  required_label=required_label,
+              )
+              return 0
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY

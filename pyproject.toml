@@ -1,0 +1,114 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fwt-re-patched"
+version = "2.5.50"
+description = "Offline client patcher and reverse-engineering tooling for Fantasy War Tactics 0.682 v1574"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "FWT Re-Patched contributors" }]
+dependencies = [
+    "python-dotenv>=1.2.4",
+]
+
+[project.optional-dependencies]
+assets = [
+    "UnityPy==1.25.4",
+    "attrs==26.1.0",
+    "cryptography==50.0.2",
+    "Pillow==13.0.0",
+    # core.alex_awakening (Feature 12.01, included in --all) requires ELF/ARM64 assembly at runtime.
+    "pyelftools>=0.33",
+    "capstone>=5.0.9",
+    "keystone-engine>=0.9.2",
+]
+analysis = [
+    "pyelftools>=0.33",
+    "capstone>=5.0.9",
+    "keystone-engine>=0.9.2",
+    "unicorn>=2.1.4",
+    "lief>=1.0.0",
+    "frida-tools>=14.13.1",
+    "polars[rtcompat]>=2.1.0",
+    "pandas>=3.1.1",
+    # DuckDB 2.x requires x86-64-v3 (AVX2); <2 preserves compatibility with older x86-64 CPUs.
+    "duckdb>=1.5.6,<2",
+    "orjson>=3.13.0",
+    "ijson>=3.6.0",
+    "jmespath>=1.1.0",
+    "rich>=15.0.0",
+    "typer>=0.29.1",
+    "click>=8.5.1",
+    "pydantic-settings>=2.16.2",
+    "adbutils>=2.12.0",
+]
+dev = [
+    # Emulation/analysis tests (tests/test_arena_cave.py, test_self_merc_cave.py)
+    # import unicorn and core.core_patches uses the ELF/assembly helpers.
+    "pyelftools>=0.33",
+    "capstone>=5.0.9",
+    "keystone-engine>=0.9.2",
+    "unicorn>=2.1.4",
+    "lief>=1.0.0",
+    "cryptography==50.0.2",
+    "UnityPy==1.25.4",
+    "attrs==26.1.0",
+    "Pillow==13.0.0",
+    "adbutils>=2.12.0",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "pytest-timeout>=2.4.0",
+    "ruff>=0.17.5",
+    "mypy>=2.4.1",
+    "hypothesis>=6.170.15",
+    "pre-commit>=4.7.0",
+    "pip-audit>=2.10.1",
+]
+
+[project.scripts]
+fwt-patcher = "fwt_patcher:main"
+
+[tool.setuptools]
+py-modules = ["fwt_patcher"]
+packages = ["core", "gui"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config -m 'not slow'"
+markers = [
+    "integration: requires the proprietary reference APK in source/",
+    "slow: disassembles the whole native library (minutes); opt in with -m slow",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["core"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 35
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".specify"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W", "C4", "SIM", "PT"]
+# E402: fwt_patcher.py inserts the project root into sys.path before imports.
+# UP045: keep Optional[...] for clarity on Python 3.12.
+ignore = ["E501", "E402", "UP045"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true
+warn_unreachable = true
+no_implicit_optional = true
+warn_return_any = true

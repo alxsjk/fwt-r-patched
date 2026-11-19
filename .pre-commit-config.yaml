@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: python -m ruff check .
+        language: system
+        types_or: [python]
+        pass_filenames: false
+      - id: mypy
+        name: mypy
+        entry: python -m mypy core gui tools fwt_patcher.py tests
+        language: system
+        types_or: [python]
+        pass_filenames: false

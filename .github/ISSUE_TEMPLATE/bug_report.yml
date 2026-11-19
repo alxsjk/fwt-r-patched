@@ -1,0 +1,78 @@
+name: Bug Report
+description: Report a bug in the patcher CLI, GUI, inspector, or a generated patch.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue.
+        **Never attach or paste copyrighted game files** (`.apk`, `.so`, `.dex`, `.dat`), signing keystores, save files, `.env` values, datatable AES keys, or personal IPs/paths.
+
+  - type: input
+    id: version
+    attributes:
+      label: Patcher Version
+      description: Output of `python fwt_patcher.py --version`
+      placeholder: "2.5.50"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Operating System
+      options:
+        - Windows
+        - Linux
+        - macOS
+    validations:
+      required: true
+
+  - type: input
+    id: feature_id
+    attributes:
+      label: Feature ID or Area (if applicable)
+      description: Reference an ID from docs/FEATURE_CATALOG.md (e.g. `12.01`, `07.06`, `GUI`, `CLI`).
+      placeholder: "12.02 / --alex-rebalance"
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Exact command flags or GUI selections and in-game steps.
+      placeholder: |
+        1. Run `python fwt_patcher.py ...`
+        2. Install APK on target device / emulator
+        3. Trigger ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: Expected vs. Actual Behavior
+      description: Describe what should happen and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: CLI / `--inspect` Output or Redacted Logs
+      description: Sanitized output only (remove local paths, usernames, LAN IPs, and secrets).
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: compliance
+    attributes:
+      label: Submission Checklist
+      options:
+        - label: I searched existing issues to make sure this is not a duplicate.
+          required: true
+        - label: I removed all personal data, local paths, `.env` keys, and proprietary game files/dumps.
+          required: true

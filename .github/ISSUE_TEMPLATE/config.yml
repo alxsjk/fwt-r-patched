@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contribution Guidelines
+    url: https://github.com/alxsjk/fwt-r-patched/blob/main/CONTRIBUTING.md
+    about: Read the rules before submitting an issue or pull request.
