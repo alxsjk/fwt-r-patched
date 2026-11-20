@@ -835,12 +835,12 @@ def test_equipment_percent_options_zeroes_only_flat_weights():
         {"_valueType": 4, "_weight1": 0, "_weight2": 200, "_weight3": 0,
          "_weight4": 0, "_weight5": 0, "_weight6": 0},
     ]
-    assert _patch_equipment_percent_options_rows(rows) == 2
+    assert _patch_equipment_percent_options_rows(rows) == 3
     assert rows[0]["_weight1"] == 0
     assert rows[0]["_weight3"] == 0
     assert rows[1]["_weight1"] == 100
     assert rows[1]["_weight3"] == 300
-    assert rows[2]["_weight2"] == 200
+    assert rows[2]["_weight2"] == 0
     assert _patch_equipment_percent_options_rows(rows) == 0
 
 

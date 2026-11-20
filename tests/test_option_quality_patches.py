@@ -18,6 +18,7 @@ from core.core_patches import (
     OPTION_BONUS_MASTERY_ORIGINAL,
     OPTION_BONUS_MASTERY_SITE,
     RANDOPTION_QUALITY_SITE,
+    RANDOPTION_SERVER_FLAT_GROUPS,
     RANDOPTION_TOP_QUALITY,
     RUNE_OPTION_MASTERY_ORIGINAL,
     RUNE_OPTION_MASTERY_REPLACEMENT,
@@ -25,7 +26,9 @@ from core.core_patches import (
     RUNE_OPTION_ROW_COUNT,
     RUNE_OPTION_ROW_SIZE,
     RUNE_OPTION_TABLE_VADDR,
+    PatchOptions,
     _randoption_rows,
+    apply_all_patches,
     apply_option_max_attributes,
     apply_rune_option_quality,
     apply_rune_quality_factor,
@@ -68,6 +71,30 @@ def test_option_max_quality_leaves_only_the_top_rows_weighted(reference_buffers)
         assert sum(weight for _id, weight, _quality in members) == sum(
             weight for _id, weight, _quality in before[key]
         ), "the attribute must keep the odds it had"
+
+
+def test_percent_only_equipment_rolls_keep_maximum_quality(reference_buffers):
+    original, dex = reference_buffers
+    result = apply_all_patches(
+        original,
+        dex,
+        PatchOptions(equipment_percent_options=True, option_max_attributes=True),
+    )
+    eligible = {
+        key
+        for key, members in _option_pools(original).items()
+        if any(option_id // 1000 not in RANDOPTION_SERVER_FLAT_GROUPS for option_id, _, _ in members)
+    }
+    pools = _option_pools(result.so_bytes)
+    assert pools.keys() == eligible
+    drawable_ids = {option_id for members in pools.values() for option_id, _, _ in members}
+    # These type-4 rolls display as +67 Defense and +267 Counter Damage.
+    assert drawable_ids.isdisjoint({5010, 43010})
+    assert all(
+        option_id // 1000 not in RANDOPTION_SERVER_FLAT_GROUPS and quality == RANDOPTION_TOP_QUALITY
+        for members in pools.values()
+        for option_id, _, quality in members
+    )
 
 
 def test_option_max_quality_is_idempotent_and_keeps_the_picker_stock(reference_buffers):

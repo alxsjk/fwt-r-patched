@@ -43,6 +43,8 @@ from core.alex_rebalance import (
     NEW_PASSIVE_ALLY_DR_5_25_ID,
     NEW_PASSIVE_COOP_20_ID,
     NEW_PASSIVE_DEBUFF_10_ID,
+    SKILLDATA_PATH_RE,
+    _read_rows,
     build_rebalance_effect_rows,
     expected_skill_updates,
     inspect_alex_rebalance_assets,
@@ -91,7 +93,8 @@ def test_expected_skill_updates_geometry_effects_and_tooltips() -> None:
     assert s2["_effect03"] == NEW_COOP_UTILITY_10_25_ID
 
     s3 = expected_skill_updates(en_path, ALEX_SKILL_3_ID, "stock")
-    assert (s3["_range"], s3["_skillRangeType"], s3["_skillEffectRange"], s3["_skillEffectRangeType"]) == (2, 0, 3, 8)
+    assert (s3["_range"], s3["_skillRangeType"]) == (3, 13)
+    assert (s3["_skillEffectRange"], s3["_skillEffectRangeType"]) == (3, 8)
     assert s3["_effect02"] == NEW_COOP_UTILITY_10_25_ID
 
     passive = expected_skill_updates(en_path, ALEX_PASSIVE_ID, "stock")
@@ -190,6 +193,21 @@ def test_rebalance_standalone_all_16_tables_and_idempotent(reference_apk: Path) 
         assert inspect_alex_rebalance_assets(resources)[0] is False
         replacements = prepare_alex_rebalance_assets(resources)
         assert len(replacements) == 16
+        for path, bundle in replacements.items():
+            if not SKILLDATA_PATH_RE.fullmatch(path):
+                continue
+            stock = {row.get("_skillId"): row for row in _read_rows(resources.read(path))}
+            patched = {row.get("_skillId"): row for row in _read_rows(bundle)}
+            alex = patched[ALEX_SKILL_3_ID]
+            jakyak = stock[1056868]  # Do not Chase me
+            assert (alex["_range"], alex["_skillRangeType"]) == (
+                jakyak["_range"], jakyak["_skillRangeType"]
+            ), path
+            assert (alex["_skillEffectRange"], alex["_skillEffectRangeType"]) == (
+                stock[ALEX_SKILL_3_ID]["_skillEffectRange"],
+                stock[ALEX_SKILL_3_ID]["_skillEffectRangeType"],
+            ), path
+            assert patched[1056868] == jakyak, path
 
         patched_bytes = _build_patched_resource_zip(resources, replacements)
         with zipfile.ZipFile(io.BytesIO(patched_bytes)) as patched_zip:

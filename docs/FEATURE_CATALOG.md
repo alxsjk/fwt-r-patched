@@ -31,19 +31,20 @@ IDs are stable references, not positions: never renumber or reuse an ID. If a fe
 | 02.04 | Unlimited event shop genes | `--event-gene-unlimited` | `event_gene_unlimited` | `var_event_gene_unlimited` | Yes |
 | 02.05 | Daily event shop limits | `--event-limits-daily` | `event_limits_daily` | `var_event_limits_daily` | Yes |
 | 02.06 | Campaign shop 90% discount (including valid category-6 coin prices) | `--campaign-shop-discount` | `campaign_shop_discount` | `var_campaign_shop_discount` | Yes |
-| 02.07 | Mythical Stone in Event Shop | `--mythical-stone-shop` | `mythical_stone_shop` | `var_mythical_stone_shop` | Yes |
+| 02.07 | Mythical Stone in Event Shop | `--mythical-stone-shop` | `mythical_stone_shop` | `var_mythical_stone_shop` | Yes (see [KB-001](KNOWN_BUGS.md)) |
 | 02.08 | Complete Costume Packages: one copy of each eligible owned costume; each package up to 10 times daily | `--costume-packages-all` | `costume_packages_all` | `var_costume_packages_all` | Yes |
 | 02.09 | Evan and Alex Shop Offers: unlimited genes (5 event coins / 1 medal); Honor Shop 100 Diamonds | `--hero-shop-offers` | `hero_shop_offers` | `var_hero_shop_offers` | Yes |
+| 02.10 | Surprise Transcendence Package 2 (10 Ultimate and 10 Universal tickets for 500 diamonds) | `--surprise-transcendence-package` | `surprise_transcendence_package` | `var_surprise_transcendence_package` | Yes |
 
 ## 03 — Equipment and soulgear
 
 | ID | Feature | CLI | PatchOptions field | GUI variable | `--all` |
 |---|---|---|---|---|---|
 | 03.01 | Recycling grants 6-star equipment | `--recycle-six-star` | `recycle_six_star` | `var_recycle_six_star` | Yes |
-| 03.02 | Max quality on every option roll | `--option-max-attributes` | `option_max_attributes` | `var_option_max_attributes` | Yes |
+| 03.02 | Max quality on every option roll (pink, including when combined with 03.05) | `--option-max-attributes` | `option_max_attributes` | `var_option_max_attributes` | Yes |
 | 03.03 | Preserve locked equipment options | `--equipment-lock-fix` | `equipment_lock_fix` | `var_equipment_lock_fix` | Yes |
 | 03.04 | One Modification Stone | `--equipment-single-mod-stone` | `equipment_single_mod_stone` | `var_equipment_single_mod_stone` | Yes |
-| 03.05 | Percentage-only equipment options | `--equipment-percent-options` | `equipment_percent_options` | `var_equipment_percent_options` | Yes |
+| 03.05 | Percentage-only equipment options (excludes direct and scaled flat values) | `--equipment-percent-options` | `equipment_percent_options` | `var_equipment_percent_options` | Yes |
 | 03.06 | Guaranteed +9 to +10 upgrade | `--equipment-upgrade-10-guarantee` | `equipment_upgrade_10_guarantee` | `var_equipment_upgrade_10_guarantee` | Yes |
 | 03.07 | Guaranteed +21 to +26 upgrades | `--upgrade-no-fail` | `upgrade_no_fail_above_20` | `var_upgrade_no_fail_above_20` | Yes |
 | 03.08 | One Black Hammer per attempt | `--single-black-hammer` | `single_black_hammer` | `var_single_black_hammer` | Yes |
@@ -84,6 +85,7 @@ IDs are stable references, not positions: never renumber or reuse an ID. If a fe
 | 06.07 | Battleship parts 90% discount | `--ship-parts-90-off` | `ship_parts_90_off` | `var_ship_parts_90_off` | Yes |
 | 06.08 | Core crystal skills 90% discount | `--crystal-skill-90-off` | `crystal_skill_90_off` | `var_crystal_skill_90_off` | Yes |
 | 06.09 | Flat hero limit break cost (1M gold + 100 Balance Jade) | `--limit-break-cost-fixed` | `limit_break_cost_fixed` | `var_limit_break_cost_fixed` | Yes |
+| 06.10 | Unknown Paradise Full Ship Repair | `--worldboss-full-ship-repair` | `worldboss_full_ship_repair` | `var_worldboss_full_ship_repair` | Yes |
 
 ## 07 — Battle Arena and Guild Raid
 
@@ -108,7 +110,7 @@ bonuses are still under investigation and are not yet guaranteed.
 |---|---|---|---|---|---|
 | 08.01 | English localization | `--english` | `english_localization` | `var_english` | Yes |
 | 08.02 | 16 KB alignment | `--no-16k` disables | `align_16k` | `var_align_16k` | Default on |
-| 08.03 | Hide phantom Coocoo boxes | Always on | Built-in fix | None | Always |
+| 08.03 | Hide phantom Coocoo boxes and disable bonus boxes in hero-gene Subjugation | Always on | Built-in fix | None | Always |
 | 08.04 | LAN server redirect | `--lan` | `lan_redirect` | `net_mode_var` | No |
 | 08.05 | Allow non-reference APK | `--force` | `allow_unknown` | `var_force` | No |
 | 08.06 | Hero EXP cap and Limit Break floor | Always on | Built-in fix | None | Always |
@@ -120,7 +122,7 @@ See the [Awakening guide](HERO_AWAKENING_GUIDE.md) and the [Skill rebalance guid
 | ID | Feature | CLI | PatchOptions field | GUI variable | `--all` |
 |---|---|---|---|---|---|
 | 12.01 | Alex Awakening: Destiny Lance | `--alex-awakening` | `alex_awakening` | `var_alex_awakening` | Yes |
-| 12.02 | Alex Skill, Passive & Awake Rebalance | `--alex-rebalance` | `alex_rebalance` | `var_alex_rebalance` | Yes |
+| 12.02 | Alex Skill, Passive & Awake Rebalance (Giga-break uses Jakyak's cast range and retains Alex's AoE) | `--alex-rebalance` | `alex_rebalance` | `var_alex_rebalance` | Yes |
 
 ## Development options
 

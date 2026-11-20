@@ -1,6 +1,6 @@
 # FWT Reborn - Offline Client Patcher & Modding Suite
 
-**Version 2.5.50** · [Changelog](CHANGELOG.md) · [Technical documentation](docs/SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md) · [Contributing](CONTRIBUTING.md)
+**Version 2.5.53** · [Changelog](CHANGELOG.md) · [Technical documentation](docs/SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md) · [Contributing](CONTRIBUTING.md)
 
 Cross-platform desktop application (**Windows & Linux**) in Python for applying deterministic patches directly to the offline Korean APK of Fantasy War Tactics (**0.682 v1574**), eliminating the need to compile a separate server when playing 100% offline on a phone or emulator with all quality-of-life enhancements enabled.
 
@@ -23,6 +23,7 @@ For developers and modders who want to understand network packets, AES/zlib encr
 - 👉 **[Complete Server Architecture & Reverse-Engineering Guide](docs/SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md)**
 - 👉 **[Awakening and original hero skills guide](docs/HERO_AWAKENING_GUIDE.md)** — research, implementation and validation workflow behind shipped feature `12.01` (`--alex-awakening`) and its lab workflow.
 - 👉 **[Skill rebalance guide](docs/SKILL_REBALANCE_GUIDE.md)** — native datatable effect & geometry rebalancing methodology, verified enums, and the Alex `12.02` benchmark.
+- 👉 **[Known bugs](docs/KNOWN_BUGS.md)** — unresolved issues with evidence and workarounds (currently KB-001: Mythical Stone display resets after a game restart).
   - Network protocol, 43-byte startup probe handshake, and TCP framing.
   - Complete packet and command table (`req_login`, `req_attendance`, `req_hero_*`, `req_equip_*`, `req_gacha`, etc.).
   - Detailed Save State schema (`fwt_server_state_v1.json`).
@@ -42,11 +43,11 @@ For developers and modders who want to understand network packets, AES/zlib encr
 The interface and the [complete feature catalog](docs/FEATURE_CATALOG.md) share permanent IDs. Use these numbers to identify the option to change:
 
 01. **Campaign, expeditions and modes** — 01.01–01.10
-02. **Summons and shops** — 02.01–02.09
+02. **Summons and shops** — 02.01–02.10
 03. **Equipment and soulgear** — 03.01–03.11
 04. **Runes** — 04.01–04.05
 05. **Gems** — 05.01–05.05
-06. **Resources and upgrade costs** — 06.01–06.09
+06. **Resources and upgrade costs** — 06.01–06.10
 07. **Battle Arena and Guild Raid** — 07.01–07.08
 08. **Language, network and build** — 08.01–08.06
 09. **Development: telemetry and controls** — 09.01–09.06
@@ -60,7 +61,7 @@ The catalog lists each CLI flag, GUI variable and `PatchOptions` or `DevOptions`
 
 Feature 12.01 adds Alex's original 5★→6★ Awakening and Destiny Lance as an independent option in the **Original hero modifications** section and via `--alex-awakening` (also included in `--all`, incompatible with `--force`). See the [guide](docs/HERO_AWAKENING_GUIDE.md) for implementation details and validation notes.
 
-Feature 12.02 (`--alex-rebalance`, also included in `--all`) rebalances Alex's Skills 1–3, *Knighthood* passive, and (when combined with 12.01) *Destiny Lance* terrain conversion using native game effect types and skill geometries across all 8 localized Unity asset tables. See the [skill rebalance guide](docs/SKILL_REBALANCE_GUIDE.md) for the complete effect specification and rebalancing workflow.
+Feature 12.02 (`--alex-rebalance`, also included in `--all`) rebalances Alex's Skills 1–3, *Knighthood* passive, and (when combined with 12.01) *Destiny Lance* terrain conversion using native game effect types and skill geometries across all 8 localized Unity asset tables. *Giga-break* uses the cast range of Jakyak's *Do not Chase me* and retains Alex's area of effect. See the [skill rebalance guide](docs/SKILL_REBALANCE_GUIDE.md) for the complete effect specification and rebalancing workflow.
 
 ### Removed experimental paths
 
@@ -183,7 +184,7 @@ In the window:
 4. Connect your ADB device (Wi-Fi or USB):
    - For a Wi-Fi emulator (e.g., MEmu/MuMu at `192.0.2.10:5555`), click **Connect IP** and enter `IP:Port`.
 5. Click:
-   - **Generate Patched APK Only**: Builds `output/FWT-Reborn-Patched-<version>-release.apk` (for example `FWT-Reborn-Patched-2.5.50-release.apk`) for manual sideloading. No ZIP wrapper is generated.
+   - **Generate Patched APK Only**: Builds `output/FWT-Reborn-Patched-<version>-release.apk` (for example `FWT-Reborn-Patched-2.5.53-release.apk`) for manual sideloading. No ZIP wrapper is generated.
    - **Generate & Install via ADB**: Backs up the save, builds the 16 KB-aligned signed APK, verifies the output, and installs it onto the device.
    - **Restore Save JSON...**: Restores a save backup (requires root).
    - **Uninstall App (wipes data)**: Removes the installed package to resolve signature conflicts; back up your save first.
@@ -230,7 +231,7 @@ the result is unknown: check the device before retrying.
 #### 1. Inspect an APK:
 ```bash
 python fwt_patcher.py --inspect source/fwt_0.682_offline_v1574.apk
-python fwt_patcher.py --inspect output/FWT-Reborn-Patched-2.5.50-release.apk
+python fwt_patcher.py --inspect output/FWT-Reborn-Patched-2.5.53-release.apk
 ```
 
 #### 2. Inspect a standalone `.so`:
@@ -276,7 +277,7 @@ python fwt_patcher.py --all --lan 192.0.2.20:8010 --output output/FWT_LAN.apk
 python tools/create_distribution_zip.py
 ```
 The archive is written as `output/FWT-Reborn-Patcher-Suite-<version>.zip`
-(for example `FWT-Reborn-Patcher-Suite-2.5.50.zip`). Custom `--output` names
+(for example `FWT-Reborn-Patcher-Suite-2.5.53.zip`). Custom `--output` names
 without the current version receive it automatically. No APK-only ZIP is
 generated; use `--apk-only` to stage/copy the versioned APK instead.
 

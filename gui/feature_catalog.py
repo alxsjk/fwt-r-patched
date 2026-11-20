@@ -49,6 +49,7 @@ FEATURE_GROUPS = (
         Feature("02.07", "mythical_stone_shop", "var_mythical_stone_shop", "--mythical-stone-shop", "Mythical Stone in Event Shop"),
         Feature("02.08", "costume_packages_all", "var_costume_packages_all", "--costume-packages-all", "Complete Costume Packages"),
         Feature("02.09", "hero_shop_offers", "var_hero_shop_offers", "--hero-shop-offers", "Evan and Alex Shop Offers"),
+        Feature("02.10", "surprise_transcendence_package", "var_surprise_transcendence_package", "--surprise-transcendence-package", "Surprise Transcendence Package 2"),
     )),
     FeatureGroup("03", "Equipment and soulgear", (
         Feature("03.01", "recycle_six_star", "var_recycle_six_star", "--recycle-six-star", "Recycling grants 6-star equipment"),
@@ -87,6 +88,7 @@ FEATURE_GROUPS = (
         Feature("06.07", "ship_parts_90_off", "var_ship_parts_90_off", "--ship-parts-90-off", "Battleship parts 90% discount"),
         Feature("06.08", "crystal_skill_90_off", "var_crystal_skill_90_off", "--crystal-skill-90-off", "Core crystal skills 90% discount"),
         Feature("06.09", "limit_break_cost_fixed", "var_limit_break_cost_fixed", "--limit-break-cost-fixed", "Flat hero limit break cost (1M gold + 100 Balance Jade)"),
+        Feature("06.10", "worldboss_full_ship_repair", "var_worldboss_full_ship_repair", "--worldboss-full-ship-repair", "Unknown Paradise Full Ship Repair"),
     )),
     FeatureGroup("07", "Battle Arena and Guild Raid", (
         Feature("07.01", "battle_arena_fix", "var_battle_arena_fix", "--battle-arena-fix", "Battle Arena team save fix"),

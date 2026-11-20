@@ -97,8 +97,8 @@ RUNE_OPTION_CLIENT_ASSET_PATH = "files/Resources/datatable/runeoption.unity3d"
 EQUIP_SUCCESS_CLIENT_ASSET_PATH = (
     "files/Resources/datatable/equipsuccessprobability.unity3d"
 )
-OPTION_PERCENT_VALUE_TYPES = (2, 4)
-OPTION_FLAT_VALUE_TYPE = 1
+OPTION_PERCENT_VALUE_TYPE = 2
+OPTION_FLAT_VALUE_TYPES = (1, 4)
 OPTION_WEIGHT_FIELDS = tuple(f"_weight{i}" for i in range(1, 7))
 RUNE_OPTION_FLAT_VALUE_TYPE = 1
 RUNE_OPTION_WEIGHT_FIELD = "_weight"
@@ -852,7 +852,7 @@ def inspect_equipment_percent_options_assets(
     )
     if rows is None:
         return False, error or "randoptiontable.unity3d unavailable"
-    flat_rows = [row for row in rows if int(row.get("_valueType", 0)) == OPTION_FLAT_VALUE_TYPE]
+    flat_rows = [row for row in rows if int(row.get("_valueType", 0)) in OPTION_FLAT_VALUE_TYPES]
     weighted_flat = [
         row
         for row in flat_rows
@@ -861,7 +861,7 @@ def inspect_equipment_percent_options_assets(
     percent_rows = [
         row
         for row in rows
-        if int(row.get("_valueType", 0)) in OPTION_PERCENT_VALUE_TYPES
+        if int(row.get("_valueType", 0)) == OPTION_PERCENT_VALUE_TYPE
         and any(int(row.get(field, 0)) > 0 for field in OPTION_WEIGHT_FIELDS)
     ]
     active = not weighted_flat and bool(percent_rows)
@@ -1400,8 +1400,8 @@ def _shop_genes_patched(rows: list[dict[str, Any]]) -> bool:
 def _patch_equipment_percent_options_rows(rows: list[dict[str, Any]]) -> int:
     """Drops flat equipment-option rows from the roll by zeroing their weights.
 
-    ``_valueType`` 2/4 are the percentage variants (the UI appends ``%``);
-    ``_valueType`` 1 is the flat variant (+50 HP, +100 Crit, ...).  Every
+    Value type 2 is percentage-based. Types 1 and 4 are flat. Type 4 stores
+    a scaled value, such as 0.0067 for +67 Defense. Every
     equip/grade pair keeps at least one percentage row, so the slot still has
     a valid pool after the flat rows are removed.
     """
@@ -1409,11 +1409,11 @@ def _patch_equipment_percent_options_rows(rows: list[dict[str, Any]]) -> int:
     percent_rows = 0
     for row in rows:
         value_type = int(row.get("_valueType", 0))
-        if value_type in OPTION_PERCENT_VALUE_TYPES:
+        if value_type == OPTION_PERCENT_VALUE_TYPE:
             if any(int(row.get(field, 0)) > 0 for field in OPTION_WEIGHT_FIELDS):
                 percent_rows += 1
             continue
-        if value_type != OPTION_FLAT_VALUE_TYPE:
+        if value_type not in OPTION_FLAT_VALUE_TYPES:
             raise ValueError(f"unexpected equipment option value type: {value_type}")
         for field in OPTION_WEIGHT_FIELDS:
             if int(row.get(field, 0)) != 0:

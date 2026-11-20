@@ -187,6 +187,7 @@ def test_gui_defaults_collect_valid_conflict_free_patch_options(
     assert options.guild_raid_boss_no_counter is True
     assert options.align_16k is True
     assert options.alex_rebalance is True
+    assert options.worldboss_full_ship_repair is True
 
 
 def test_gui_option_vars_wire_all_features_and_preserve_exclusions(
@@ -220,6 +221,7 @@ def test_gui_option_vars_wire_all_features_and_preserve_exclusions(
         ("var_event_limits_daily", "event_limits_daily", True),
         ("var_mythical_stone_shop", "mythical_stone_shop", True),
         ("var_hero_shop_offers", "hero_shop_offers", True),
+        ("var_surprise_transcendence_package", "surprise_transcendence_package", True),
         ("var_costume_packages_all", "costume_packages_all", True),
         ("var_recycle_six_star", "recycle_six_star", True),
         ("var_campaign_shop_discount", "campaign_shop_discount", True),
@@ -254,6 +256,7 @@ def test_gui_option_vars_wire_all_features_and_preserve_exclusions(
         ("var_coocoo_exp_x2", "coocoo_exp_x2", True),
         ("var_coocoo_level_x2", "coocoo_level_x2", True),
         ("var_ship_parts_90_off", "ship_parts_90_off", True),
+        ("var_worldboss_full_ship_repair", "worldboss_full_ship_repair", True),
         ("var_crystal_skill_90_off", "crystal_skill_90_off", True),
         ("var_gem_mining_x10", "gem_mining_x10", True),
         ("var_gem_mining_types", "gem_mining_types", True),

@@ -136,6 +136,11 @@ Before changing development build instrumentation:
 - Never commit copyrighted binaries (`source/`, `*.apk`, `*.so`, `*.dex`, `*.dat`), user saves (`backups/`), signing keystores (`keystore/`), secrets (`.env`, `*.local.json`), build outputs (`output/`), coverage files (`.coverage`), or local editor/harness directories (`.commandcode/`).
 - Do not manually edit generated files under `.specify/scripts/`, `.specify/templates/`, or `.agents/skills/speckit-*` unless overriding intentionally via Spec Kit presets/extensions (checksums are tracked in `.specify/integrations/*.manifest.json`).
 
+## APK Builds
+
+Always pass `--all` when generating APK builds for the user so each build
+includes the full default feature set.
+
 ## Verification Gates
 
 Run checks inside the project virtualenv rather than a bare system Python:

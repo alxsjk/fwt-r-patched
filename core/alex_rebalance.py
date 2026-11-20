@@ -156,8 +156,9 @@ def expected_skill_updates(path: str, sid: int, current_tooltip: str) -> dict[st
         }
     if sid == ALEX_SKILL_3_ID:
         return {
-            "_range": 2,
-            "_skillRangeType": 0,
+            # Cast range from Jakyak's Do not Chase me (1056868).
+            "_range": 3,
+            "_skillRangeType": 13,
             "_skillEffectRange": 3,
             "_skillEffectRangeType": 8,
             "_effect01": ALEX_SKILL_3_STUN_EFFECT,

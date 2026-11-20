@@ -49,8 +49,9 @@ locales:
 - Skill 2 uses Sehee Skill 2 geometry `(5, 13, 5, 19)`, replaces flat Atk reduction with
   `-10%..-30%` percentage Atk reduction (`0x10018101`), and adds `+10%..+25%` co-op
   Final Skill Power (`0x10018102`).
-- Skill 3 uses Lance Skill 2 geometry `(2, 0, 3, 8)` and adds `+10%..+25%` co-op Final
-  Skill Power (`0x10018102`).
+- Skill 3 uses the cast range `(3, 13)` from Jakyak's *Do not Chase me*
+  (`1056868`), retains Alex's AoE `(3, 8)`, and adds `+10%..+25%` co-op
+  Final Skill Power (`0x10018102`).
 - Passive keeps `+10%` damage vs. debuffed targets natively on `1048963` (`0x10018105`),
   replacing incoming crit damage reduction (`26742786`) with `+20%` co-op damage
   (`0x10018103`) and `-5%..-25%` incoming hit damage reduction while `>= 2` allies are
@@ -241,9 +242,9 @@ Status legend:
 | 39 | `gem_upgrade_gold_half` | 50% Off Gem Upgrade Gold | SO | `GemStateAccess::graft` fee site `0x8ACA6C`; `sub x0, x22, x26` -> `sub x0, x22, x26, lsr #1` | Active (actual gold debit halved) |
 | 39b | `gem_level6` | Gems Level 6 | SO | 9 gem-code strings at `0x21BD6F`, `0x4D4F78`, `0x499897`, `0x5FE5E8`, `0x3B2D83`, `0x2A3B7E`, `0x41516C`, `0x546E6C`, `0x505EC3`; last digit `1` -> `6` | Active/validated at runtime (lobby gem screen gives level-6 gems, 2026-11-09) |
 | 40 | `guild_raid_reward_x10` | Guild Raid Rank Rewards x10 | SO | tables `0x758260` / `0x7583A0`; 32 amounts x10 | Active (daily + weekly mails, 2026-11-09) |
-| 40b | `option_max_attributes` | Option-Change Potion Max Bias | SO | `0xA16FEC` (`mov w3, wzr` -> `#1`), `0xA16FF0` (`mov w4, wzr` -> `#0x1c2` / 450) in `change_option` | Active (enabled by default in the GUI and `--all`; standalone CLI opt-in) |
+| 40b | `option_max_attributes` | Max Quality on Every Option Roll | SO | Transfer each attribute and equipment-grade pool's roll weight to its highest-quality rows, using the quality table at `0x634060` | Active (enabled by default in the GUI and `--all`; compatible with percentage-only rolls) |
 | 42b | `equipment_single_mod_stone` | One Modification Stone | SO + client | server `equipment_option_change_material_count_json` `0x8A4DC8`, site `0x8A4F3C` (`csinc` -> `mov x0, #1`); client hook `0xAB3388` -> cave `0xB337B4` patches `0x1CF069C` (`mov w1, w23` -> `mov w1, wzr`) | Active/validated at runtime (cost label and confirmation show 1 stone; server charged exactly one with two locked lines) |
-| 42c | `equipment_percent_options` | Percent-only Equipment Options | SO + assets (`randoptiontable.unity3d`) | server table `0x621E60`, 1856 rows × 40 B, flat groups `1,2,3,21,23,25,26` -> six grade weights zeroed (296) plus the zero-weight picker fallback at `0x9A2AAC` (`b.eq` -> `b`); client flat rows `_valueType=1` -> all six `_weightN` zeroed | Active (weights + fallback) |
+| 42c | `equipment_percent_options` | Percent-only Equipment Options | SO + assets (`randoptiontable.unity3d`) | server table `0x621E60`, 1856 rows × 40 B, direct and scaled flat groups -> six grade weights zeroed plus the zero-weight picker fallback at `0x9A2AAC`; client value types 1 and 4 -> all six `_weightN` zeroed | Active (weights + fallback) |
 | 42d | `equipment_upgrade_10_guarantee` | +10 Upgrade Always Succeeds | SO + assets (`equipsuccessprobability.unity3d`) | fail-probability table `0x6BC118` index 9 (`0x6BC160`, 8 B) `595082` -> `0`; client `equipsuccessprobability` row 9 also `_successProb1..6=100000` | Active/validated at runtime (10/10 direct server requests went +9 -> +10; +10 -> +11 still fails) |
 | 42 | `equipment_lock_fix` | Locked Options Survive the First Roll | SO | NOP at `0xA18354` (`EquipmentStateAccess::change_option` `0xA1832C` calling `refresh_equipment_options_for_code_json` `0xA16FB8`) | Active/validated at runtime (0 lock violations after the fix; before it 10 violations in 17 transitions) |
 | 43 | `rune_quality_factor` | Rune Attribute Quality x10 + Percent Only | SO + assets (`runeoption.unity3d`) | `rolled_rune_options_json` `0xA2E65C`: bonus load at `0xA2EB90` -> `movz x9, #min(10000, 450 * factor)`; 420 flat weights zeroed in the verified rune option table at `0x6ED510` and in the client `runeoption.unity3d` rows (`_valueType=1` -> `_weight=0`) | Active (server + client tables); device validation pending |
@@ -254,7 +255,7 @@ Status legend:
 | 45 | `limit_break_cost_tenth` | 90% Hero Limit Break Cost | SO + assets (`limitbreakcost.unity3d`) | `kFwtCreatureLimitBreakCosts` `0x756CF0`, 45 rows x 24 B, quantity `+16` and gold `+20` divided by 10 | Active; mutually exclusive with `limit_break_cost_fixed` |
 | 45b | `limit_break_cost_fixed` | Flat Hero Limit Break Cost (1M gold + 100 Balance Jade) | SO + assets (`limitbreakcost.unity3d`) | `kFwtCreatureLimitBreakCosts` `0x756CF0`, all 45 rows: quantity `+16` = 100, gold `+20` = 1,000,000; client rows `_rewardValue02`/`_cost` set to the same pair | Active; shipped by `--all`; mutually exclusive with the 90% profile |
 | 46 | `soulgear_enchant_always` | Soulgear Enchant Always Succeeds | SO | `SoulgearGrowthStateAccess::apply`: verdict `cset w8, lo` at `0x8B3B4C` -> `mov w8, #1` | Active; gold-paid enchant always succeeds (soulgear upgrade has no roll) |
-| 47 | `no_win_box` | Hide Phantom Cocoo Boxes | SO | `battle_has_mapped_coocoo_box` `0x8DA77C` -> `mov w0, wzr ; ret` (original `mov x8, x0 ; ldrb w9, [x0, #0xac]`); single caller `0x80F0D8` writes `"is_win_box"` | Active; the embedded server never populates `coocoobox_reward(_list)`, so returning `false` removes phantom battle-end box rows |
+| 47 | `no_win_box` | Hide Phantom Coocoo Boxes | SO | Battle advertisement off at `0x8DA77C`; Subjugation box gate at `0x8CFC7C` skips bonus boxes for mapped hero-gene stages | Always active |
 | 48 | `guild_raid_fire_support` | Guild Raid Fire Support (100% HP + Odd Turns) | SO + client + assets (`guildskilldata.unity3d`) | `guildskilldata` effect `1048578` -> `_value01=1.0, _value01Factor=0, _value02=0, _value02Factor=0`; runtime hook `0xAB335C` -> `0xB2ABC0` gates `0x018E7060` (`Player$$ExecuteReservedLordSkill`) to odd turns for `0x20000002` | Active (100% maxHp on minions; reserved auto-cast fires at odd-turn start; other skills unchanged) |
 | 49 | `guild_raid_skills_max` | Guild Raid Skills Maxed (1M / 100%) | assets (`guildskilldata.unity3d`, `guildskillinfo*.unity3d`) | Effects `1048577` (1M flat boss dmg), `1048579` (100% 1-hit DR), `1048580` (100% HP), `1048581` (100% MP), `1048582` (20 debuffs dispelled), all factors `0.0`; Absolute Protection (`536870915`) also links `effect03=1048581` (`target=1`) across all 8 `guildskillinfo*` bundles | Active (composes orthogonally with `guild_raid_fire_support`) |
 | 50 | `guild_raid_boss_no_counter` | Guild Raid Boss 0% Counter Rate | assets (`monsterdata.unity3d`) | All 70 Guild Raid boss rows (`400-01`..`400-07` host + spawn levels 1..9, `_boss == 100`): `_car = -1.0` -> `0.0` (overrides `CreatureData._baseCar = 0.03`) | Active (all Guild Raid bosses at 0% counter rate) |
@@ -370,12 +371,19 @@ bootstrap's integrity contract must be updated in the same build:
 - Replaces event 278 offer `2330278` with item `2040031` (one Mythical Stone), price 50 event coins, daily limit 100. Offer `2331278` remains Balance Jade (20 units) with a daily limit of 20 purchases.
 - Updates both copies in the embedded server catalog in place after price and limit patches. Native period maintenance and purchase-count checks remain in place. On the disposable emulator, the UI displayed 50 coins and 0/100, one purchase added item 2040031 and charged 50 coins, the 100th Stone and 20th Jade purchases succeeded, and both offers were blocked afterward. Moving the test save to the next daily period reset both counters to zero.
 - Names are shortened in some language slots to fit the fixed-size native records; one Balance Jade label loses an internal space.
+- **Known limitation ([KB-001](KNOWN_BUGS.md))**: purchases are charged, delivered, persisted, and usable in the same session, but the client inventory and costume enchant display reset to zero after a game restart. Server-side state is preserved; spend the stones in the session in which they are bought.
 
 #### `hero_shop_offers` — Evan and Alex Shop Offers (02.09)
 
 - Replaces event 278 costume offer `2250278` with one Evan gene (`120741`) for 5 event coins and Honor Shop Diamond offer `1103` with one Alex gene (`130181`) for 1 medal. Both use the native unlimited sentinel `255/255`.
 - Changes Honor offer `1104` from 60 to 100 Diamonds while retaining its price and limit. Native catalog copies are verified and rewritten without resizing, including its NUL-terminated fragment. One localized Diamond label becomes `Diamond` to fit the new count.
 - The fixed hero prices apply after the existing shop discount and limit patches. Static and integration checks do not establish runtime delivery or UI behavior; device validation remains pending.
+
+#### `surprise_transcendence_package` — Surprise Transcendence Package 2 (02.10)
+
+- Surprise Sale offer `75103` uses isolated package `103899` for 500 diamonds.
+- The package delivers ten Ultimate Equipment Transcendence Tickets (`130006`) and ten Universal Transcendence Tickets (`130000`) through the normal package delivery flow.
+- Six checked native catalog records preserve JSON slot lengths and other offers' original package `103114`. The target listing comes from the server catalog.
 
 #### 9. `event_gene_unlimited` — Unlimited Event Genes
 
@@ -878,6 +886,13 @@ bootstrap's integrity contract must be updated in the same build:
 - Renamed from `ship_parts_half` (when it originally halved costs in 2.5.4);
   `--ship-parts-half` and `apply_ship_parts_half` are kept as compatibility aliases.
 
+#### 06.10. `worldboss_full_ship_repair` — Unknown Paradise Full Ship Repair
+
+- Timed repair sets the post-tick HP to the calculated maximum at `0x976048`, after the stock first repair interval.
+- Instant Repair uses a full-bar repair amount at `0x849D60`. The stock HP setter clamps the sum to maximum HP.
+- Revive uses 100% of maximum HP at `0x97704C`. The inspector requires all three native replacements.
+- Battle damage settlement, repair eligibility, and payment retain their stock behavior.
+
 #### 36. `crystal_skill_90_off` — 90% Off Core Crystal Upgrades
 
 - `WORLDBOSS_SHIP_SKILL_LEVELUP` charges hard-coded 50 Kraken Scales
@@ -1021,14 +1036,15 @@ bootstrap's integrity contract must be updated in the same build:
 
 #### 42c. `equipment_percent_options` — Percent-only Equipment Options
 
-- Client `randoptiontable.unity3d`: `_valueType == 1` (flat: +100 Crit,
-  +50 HP) rows get all six `_weight1.._weight6` set to 0; `_valueType` 2/4
-  (percentage) rows keep their weights. The UI list still shows the flat
-  descriptions, but they cannot be drawn.
+- Client `randoptiontable.unity3d`: direct flat (type 1) and scaled flat
+  (type 4) rows get all six `_weight1.._weight6` set to 0. Type 2 rows
+  keep their weights. For example, type 4 option `43010` stores 0.0267
+  and displays +267 Counter Damage. The UI list still shows zero-weight
+  options.
 - Server table `fwt_randoption_rows(int&)::rows` at `0x621E60`: 1856 rows of
   40 bytes (`id`, group, equip, six grade weights at `+0x0C`, sort at `+0x24`).
-  Flat option ids are the groups `1, 2, 3, 21, 23, 25, 26` (for example
-  `1001-1050`, `21001-21050`); all six weights are zeroed (296 weights).
+  Flat option groups are `1, 2, 3, 4, 5, 6, 21, 23, 25, 26, 39, 41, 43`.
+  All six grade weights are zeroed in these groups.
 - Zero-weight fallback at `0x9A2AAC`: the picker sums the grade weights of the
   candidate rows and, when the total is zero, used to return the pool's
   best-quality row. A pool made only of flat rows therefore kept producing a
@@ -1036,7 +1052,7 @@ bootstrap's integrity contract must be updated in the same build:
   check (`b.eq 0x9A2F0C`, `00230054`) becomes unconditional (`b 0x9A2F0C`,
   `18010014`), so such a pool returns an empty option id and the caller
   advances to the next attribute.
-- Reference count: **297** (296 server weights + the fallback branch).
+- Reference count: **597** (596 server weights + the fallback branch).
   Idempotent. Each equipment type and grade 1-5 keeps at least one weighted
   percentage row.
 - Existing installs cache the extracted datatable under
@@ -1192,14 +1208,14 @@ bootstrap's integrity contract must be updated in the same build:
 
 #### 47. `no_win_box` — Hide Phantom Cocoo Boxes
 
-- `battle_has_mapped_coocoo_box` (`0x8DA77C`) has one direct caller (`0x80F0D8`),
-  which writes `"is_win_box":true/false` in battle results. Because the embedded
-  server leaves `coocoobox_reward` (`null`) and `coocoobox_reward_list` (`[]`)
-  empty and never grants a box item, advertising `true` causes phantom UI box
-  entries that never arrive.
-- Replaces `0x8DA77C` (`mov x8, x0 ; ldrb w9, [x0, #0xac]`) with
-  `mov w0, wzr ; ret` (`e0031f2ac0035fd6`).
-- Reference count: **1** site (8 bytes). Idempotent.
+- The battle result uses `battle_has_mapped_coocoo_box` at `0x8DA77C` to advertise
+  box slots even when the battle payload leaves them empty. Return false at that site.
+- Subjugation populates the box list separately from regular drops. For example,
+  the original post-battle reward group 140 produced 39 box entries in a ten-run
+  sweep of hero-gene stage `116040`. The gate at `0x8CFC7C` checks the mapped
+  hero gene ID after the normal reward path. Gene stages take the stock no-box
+  exit. Other stages retain both stock box mapping checks.
+- Reference count: **2** sites. Idempotent.
 
 #### 51. `hero_exp_cap` — Hero EXP Cap & Un-transcended Limit Break Floor
 

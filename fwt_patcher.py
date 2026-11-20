@@ -357,6 +357,7 @@ def run_cli(args: argparse.Namespace) -> int:
         event_limits_daily=(args.all or args.event_limits_daily),
         mythical_stone_shop=(args.all or args.mythical_stone_shop),
         hero_shop_offers=(args.all or args.hero_shop_offers),
+        surprise_transcendence_package=(args.all or args.surprise_transcendence_package),
         alex_awakening=(args.all or args.alex_awakening),
         alex_rebalance=(args.all or args.alex_rebalance),
         costume_packages_all=(args.all or args.costume_packages_all),
@@ -397,6 +398,7 @@ def run_cli(args: argparse.Namespace) -> int:
         coocoo_exp_x2=(args.all or args.coocoo_exp_x2),
         coocoo_level_x2=(args.all or args.coocoo_level_x2),
         ship_parts_90_off=(args.all or args.ship_parts_90_off),
+        worldboss_full_ship_repair=(args.all or args.worldboss_full_ship_repair),
         crystal_skill_90_off=(args.all or args.crystal_skill_90_off),
         gem_mining_x10=(args.all or args.gem_mining_x10),
         gem_mining_types=(args.all or args.gem_mining_types),
@@ -656,6 +658,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--event-limits-daily", action="store_true", help="Convert event-limited shop items (limit_type=3) to daily limits")
     parser.add_argument("--mythical-stone-shop", action="store_true", help="Add Mythical Stone to the Event Shop and increase the Balance Jade daily limit")
     parser.add_argument("--hero-shop-offers", action="store_true", help="Offer Evan and Alex genes and increase the Honor Shop diamond bundle")
+    parser.add_argument("--surprise-transcendence-package", action="store_true", help="Offer 10 Ultimate and 10 Universal Transcendence Tickets for 500 diamonds in Surprise Sale package 2")
     parser.add_argument("--alex-awakening", action="store_true", help="Enable Alex's original Awakening and Destiny Lance")
     parser.add_argument("--alex-rebalance", action="store_true", help="Rebalance Alex Skills 1-3, Passive, and Destiny Lance 1-cell Thornbush")
     parser.add_argument("--costume-packages-all", action="store_true", help="Give one copy of each eligible owned costume from packages 3 and 4, up to ten times daily per package")
@@ -723,6 +726,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Reduce Unknown Paradise battleship part gold upgrade costs by 90%% (--ship-parts-half is kept as a legacy alias)",
     )
     parser.add_argument("--crystal-skill-90-off", action="store_true", help="Reduce Unknown Paradise core crystal upgrade costs by 90%% (50 -> 5 Kraken Scales)")
+    parser.add_argument("--worldboss-full-ship-repair", action="store_true", help="Restore full ship HP on successful Unknown Paradise repair")
     parser.add_argument("--gem-mining-x10", action="store_true", help="Award 10 gems per paid gem-mining roll (20 crystals), same gem type")
     parser.add_argument("--gem-level6", action="store_true", help="Gems obtained or bought in the lobby gem screen are level 6 instead of level 1")
     parser.add_argument("--gem-mining-types", action="store_true", help="Restrict gem-mining rolls to MP, Counter Rate, Counter Damage, Dodge and Hit Rate")

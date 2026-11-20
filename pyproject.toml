@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fwt-re-patched"
-version = "2.5.50"
+version = "2.5.53"
 description = "Offline client patcher and reverse-engineering tooling for Fantasy War Tactics 0.682 v1574"
 readme = "README.md"
 requires-python = ">=3.12"

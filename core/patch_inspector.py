@@ -247,6 +247,8 @@ from core.core_patches import (
     SUMMON_POOLS,
     SUMMON_TARGETS,
     SUMMON_TARGETS_50_30_20,
+    SWEEP_GENE_BOX_PATCHED,
+    SWEEP_GENE_BOX_SITE,
     WORLDBOSS_CYCLE_REWARD_PATCHED_SHA256,
     WORLDBOSS_CYCLE_REWARD_TARGET_COUNT,
     WORLDBOSS_DAILY_KRAKEN_CAVE_BYTES,
@@ -254,6 +256,7 @@ from core.core_patches import (
     WORLDBOSS_DAILY_KRAKEN_SITE,
     WORLDBOSS_EVENT_REWARD_ORIGINAL,
     WORLDBOSS_EVENT_REWARD_SITE,
+    WORLDBOSS_FULL_SHIP_REPAIR_SITES,
     PatchOptions,
     _build_dimension_cave,
     _build_dimension_gene_cave,
@@ -273,6 +276,7 @@ from core.equipment_tier_upgrades import inspect_equipment_tiers
 from core.guild_raid_fire_support import inspect_guild_raid_fire_support
 from core.hero_shop_offers import inspect_hero_shop_offers
 from core.mythical_shop import inspect_mythical_shop
+from core.surprise_transcendence_package import inspect_surprise_transcendence_package
 
 MIN_ELF_ALIGN = 16384
 SIGNATURE_V2_ID = 0x7109871A
@@ -728,6 +732,13 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
     except Exception as exc:
         _feature(reports, "hero_shop_offers", "Evan and Alex Shop Offers", False, "Unknown", str(exc))
 
+    active = inspect_surprise_transcendence_package(so_bytes, seg_offset)
+    _feature(
+        reports, "surprise_transcendence_package", "Surprise Transcendence Package 2", active,
+        "Active (500 diamonds, 10 of each ticket)" if active else "Original / Partial",
+        "Offer 75103 and both isolated ticket components",
+    )
+
     try:
         from core.alex_awakening import inspect_alex_awakening_native
 
@@ -1053,8 +1064,13 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
     try:
         win_offset = seg_offset(NO_WIN_BOX_SITE)
         win_bytes = bytes(so_bytes[win_offset:win_offset + len(NO_WIN_BOX_ORIGINAL)])
-        if win_bytes == NO_WIN_BOX_PATCHED:
-            win_state = "Active (is_win_box always false)"
+        sweep_offset = seg_offset(SWEEP_GENE_BOX_SITE)
+        sweep_active = so_bytes[sweep_offset:sweep_offset + len(SWEEP_GENE_BOX_PATCHED)] == SWEEP_GENE_BOX_PATCHED
+        active = win_bytes == NO_WIN_BOX_PATCHED and sweep_active
+        if active:
+            win_state = "Active (battle advertisement and hero-gene sweep boxes off)"
+        elif win_bytes == NO_WIN_BOX_PATCHED:
+            win_state = "Partial (hero-gene sweep box gate missing)"
         elif win_bytes == NO_WIN_BOX_ORIGINAL:
             win_state = "Original (result payload may advertise an ungranted box)"
         else:
@@ -1063,9 +1079,9 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             reports,
             "no_win_box",
             "Hide Phantom Win Boxes",
-            win_bytes == NO_WIN_BOX_PATCHED,
+            active,
             win_state,
-            f"site 0x{NO_WIN_BOX_SITE:x}, original {NO_WIN_BOX_ORIGINAL.hex()}",
+            f"battle guard 0x{NO_WIN_BOX_SITE:x}; sweep gate 0x{SWEEP_GENE_BOX_SITE:x}",
         )
     except Exception as exc:
         _feature(reports, "no_win_box", "Hide Phantom Win Boxes", False, "Unknown", str(exc))
@@ -1946,6 +1962,21 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             "Unknown",
             str(exc),
         )
+
+    repair_sites = sum(
+        so_bytes[offset:offset + len(replacement)] == replacement
+        for site, _, replacement in WORLDBOSS_FULL_SHIP_REPAIR_SITES
+        for offset in (seg_offset(site),)
+    )
+    repair_active = repair_sites == len(WORLDBOSS_FULL_SHIP_REPAIR_SITES)
+    _feature(
+        reports,
+        "worldboss_full_ship_repair",
+        "Unknown Paradise Full Ship Repair",
+        repair_active,
+        "Active (Full HP)" if repair_active else "Original / Partial",
+        f"{repair_sites}/{len(WORLDBOSS_FULL_SHIP_REPAIR_SITES)} repair paths patched",
+    )
 
     # 12d4. Unknown Paradise crystal skill 90% discount
     try:
@@ -3283,6 +3314,8 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
         expected["mythical_stone_shop"] = "Mythical Stone Event Shop"
     if options.hero_shop_offers:
         expected["hero_shop_offers"] = "Evan and Alex Shop Offers"
+    if options.surprise_transcendence_package:
+        expected["surprise_transcendence_package"] = "Surprise Transcendence Package 2"
     if options.alex_awakening:
         expected["alex_awakening"] = "Alex Awakening: Destiny Lance"
     if options.alex_rebalance:
@@ -3370,6 +3403,8 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
         expected["coocoo_level_x2"] = "Coocoo Level x2"
     if options.ship_parts_90_off:
         expected["ship_parts_90_off"] = "90% Off Battleship Parts"
+    if options.worldboss_full_ship_repair:
+        expected["worldboss_full_ship_repair"] = "Unknown Paradise Full Ship Repair"
     if options.crystal_skill_90_off:
         expected["crystal_skill_90_off"] = "90% Off Core Crystal Upgrades"
     if options.gem_mining_x10:

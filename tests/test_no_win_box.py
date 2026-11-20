@@ -1,21 +1,21 @@
-"""Tests for the win-box advertisement patch.
-
-The battle result payload carries ``"is_win_box":`` followed by ``true``/``false``, chosen by
-the single caller of ``battle_has_mapped_coocoo_box`` (``0x8da77c``).  The embedded server
-never fills ``coocoobox_reward``/``coocoobox_reward_list`` and never inserts a box item, so a
-``true`` only produces box rows in the end-of-battle list that never reach the inventory.
-The patch makes the function return 0 without touching anything else.
-"""
+"""Tests for the battle advertisement and hero-gene Subjugation box guards."""
 
 from __future__ import annotations
 
+import struct
+
 import pytest
 from capstone import CS_ARCH_ARM64, CS_MODE_ARM, Cs
+from unicorn import UC_ARCH_ARM64, UC_HOOK_CODE, UC_MODE_ARM, Uc
+from unicorn.arm64_const import UC_ARM64_REG_W21, UC_ARM64_REG_X22
 
 from core.core_patches import (
     NO_WIN_BOX_ORIGINAL,
     NO_WIN_BOX_PATCHED,
     NO_WIN_BOX_SITE,
+    SWEEP_GENE_BOX_ORIGINAL,
+    SWEEP_GENE_BOX_PATCHED,
+    SWEEP_GENE_BOX_SITE,
     apply_no_win_box,
     seg_offset,
 )
@@ -40,7 +40,7 @@ def test_patch_forces_a_false_verdict(reference_buffers) -> None:
     so_bytes, _ = reference_buffers
     buf = bytearray(so_bytes)
 
-    assert apply_no_win_box(buf) == 1
+    assert apply_no_win_box(buf) == 2
     assert _window(buf) == NO_WIN_BOX_PATCHED
 
     md = Cs(CS_ARCH_ARM64, CS_MODE_ARM)
@@ -49,25 +49,24 @@ def test_patch_forces_a_false_verdict(reference_buffers) -> None:
     assert second.mnemonic == "ret"
 
 
-def test_patch_touches_only_that_window(reference_buffers) -> None:
+def test_patch_touches_only_the_box_guards(reference_buffers) -> None:
     so_bytes, _ = reference_buffers
     buf = bytearray(so_bytes)
     apply_no_win_box(buf)
 
     start = seg_offset(NO_WIN_BOX_SITE)
-    changed_offsets = [
-        i for i in range(len(so_bytes)) if so_bytes[i] != buf[i]
-    ]
-    assert changed_offsets, "the patch changed nothing"
-    assert min(changed_offsets) >= start
-    assert max(changed_offsets) < start + len(NO_WIN_BOX_ORIGINAL)
-    assert len(changed_offsets) == 7  # movz keeps one byte of the original mov
+    sweep = seg_offset(SWEEP_GENE_BOX_SITE)
+    assert so_bytes[sweep:sweep + len(SWEEP_GENE_BOX_ORIGINAL)] == SWEEP_GENE_BOX_ORIGINAL
+    assert buf[sweep:sweep + len(SWEEP_GENE_BOX_PATCHED)] == SWEEP_GENE_BOX_PATCHED
+    buf[start:start + len(NO_WIN_BOX_ORIGINAL)] = NO_WIN_BOX_ORIGINAL
+    buf[sweep:sweep + len(SWEEP_GENE_BOX_ORIGINAL)] = SWEEP_GENE_BOX_ORIGINAL
+    assert bytes(buf) == so_bytes
 
 
 def test_patch_is_idempotent(reference_buffers) -> None:
     so_bytes, _ = reference_buffers
     buf = bytearray(so_bytes)
-    assert apply_no_win_box(buf) == 1
+    assert apply_no_win_box(buf) == 2
     once = bytes(buf)
     assert apply_no_win_box(buf) == 0
     assert bytes(buf) == once
@@ -80,3 +79,31 @@ def test_patch_refuses_a_foreign_guard(reference_buffers) -> None:
     buf[start:start + 4] = b"\x1f\x20\x03\xd5"  # nop: not the stock prologue
     with pytest.raises(ValueError, match="Unexpected win box guard"):
         apply_no_win_box(buf)
+
+
+@pytest.mark.parametrize(
+    ("gene_id", "mapping", "group", "should_roll"),
+    [(1181809, 1137, 140, False), (-1, 1137, 140, True), (-1, 0, 140, False), (-1, 1137, 0, False)],
+)
+def test_sweep_box_gate_preserves_stock_checks(gene_id, mapping, group, should_roll) -> None:
+    cpu = Uc(UC_ARCH_ARM64, UC_MODE_ARM)
+    cpu.mem_map(0x8CF000, 0x2000)
+    cpu.mem_map(0x100000, 0x1000)
+    cpu.mem_write(SWEEP_GENE_BOX_SITE, SWEEP_GENE_BOX_PATCHED)
+    cpu.mem_write(0x10007C, struct.pack("<i", gene_id))
+    cpu.mem_write(0x1000A4, struct.pack("<ii", mapping, group))
+    cpu.reg_write(UC_ARM64_REG_X22, 0x100000)
+    fallthrough = SWEEP_GENE_BOX_SITE + len(SWEEP_GENE_BOX_PATCHED)
+    no_box = 0x8D01AC
+    reached = []
+
+    def stop_at_exit(uc, address, _size, _context):
+        if address in (fallthrough, no_box):
+            reached.append(address)
+            uc.emu_stop()
+
+    cpu.hook_add(UC_HOOK_CODE, stop_at_exit)
+    cpu.emu_start(SWEEP_GENE_BOX_SITE, no_box + 4, count=7)
+    assert reached == [fallthrough if should_roll else no_box]
+    if should_roll:
+        assert cpu.reg_read(UC_ARM64_REG_W21) == group

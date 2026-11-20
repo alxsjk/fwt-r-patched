@@ -39,6 +39,7 @@ from core.guild_raid_fire_support import (
 from core.guild_raid_fire_support import apply_guild_raid_fire_support
 from core.hero_shop_offers import apply_hero_shop_offers
 from core.mythical_shop import apply_mythical_shop
+from core.surprise_transcendence_package import apply_surprise_transcendence_package
 from core.version import APP_VERSION
 
 REFERENCE_SO_SHA256 = "03ec76a1d50e2406cb1ecd6f8bfdb532a3bc06452873b76fc52878fa56d14fd9"
@@ -596,6 +597,14 @@ COOCOO_STAGE_LEVELS = (
 # ---------------------------------------------------------------------------
 # Unknown Paradise: Battleship Parts & Core Crystal Upgrades
 # ---------------------------------------------------------------------------
+# Finish timed repair at max HP, restore a full HP bar at the shop (the
+# setter clamps the result), and revive with 100% of the calculated max HP.
+WORLDBOSS_FULL_SHIP_REPAIR_SITES = (
+    (0x976048, bytes.fromhex("1801168b"), bytes.fromhex("f80315aa")),  # mov x24, x21
+    (0x849D60, bytes.fromhex("01dd44fd"), bytes.fromhex("01106e1e")),  # fmov d1, #1.0
+    (0x97704C, bytes.fromhex("01106a1e"), bytes.fromhex("01106e1e")),  # fmov d1, #1.0
+)
+
 # `worldboss_ship_part_gold_cost` (0x977FB8) reads three int64 cost arrays in
 # .rodata.  .rodata has vaddr == file offset (delta 0), so the addresses below
 # are also the byte offsets used by the patcher.
@@ -838,9 +847,9 @@ SINGLE_MOD_STONE_CAVE_SIZE = 0x4C
 RANDOPTION_SERVER_SITE = 0x621E60
 RANDOPTION_SERVER_ROW_SIZE = 40
 RANDOPTION_SERVER_ROW_COUNT = 1856
-# Flat-option ids group by their high digits (1001-1050, 2001-2027,
-# 3001-3050, 21001-21050, 23001-23050, 25001-25050, 26001-26019).
-RANDOPTION_SERVER_FLAT_GROUPS = frozenset({1, 2, 3, 21, 23, 25, 26})
+# Groups map to client value types 1 (direct flat) and 4 (scaled flat).
+# For example, type 4 option 43010 stores 0.0267 and displays +267 Counter Damage.
+RANDOPTION_SERVER_FLAT_GROUPS = frozenset({1, 2, 3, 4, 5, 6, 21, 23, 25, 26, 39, 41, 43})
 RANDOPTION_SERVER_WEIGHT_OFFSET = 0x0C
 RANDOPTION_SERVER_GRADE_COUNT = 6
 # Parallel table (12 bytes per row: option id, quality grade, combat power) that
@@ -1044,14 +1053,17 @@ SOULGEAR_ENCHANT_REGISTER = 8
 # battle_has_mapped_coocoo_box (0x8da77c) decides whether the result payload says the battle
 # carried a cocoo box: its single caller (0x80f0d8) writes "is_win_box": and then true/false
 # from the return value (the two literals live at 0x4d5da7 and 0x2f04e6).  The embedded
-# server never fills coocoobox_reward / coocoobox_reward_list -- both are hardcoded null / []
-# in every template in the binary -- and no code path inserts a box item into the inventory,
-# so a true here only makes the client draw box slots that are never granted.  That is the
-# "items listed at the end of the battle that never arrive" report.  Forcing the function to
-# return 0 is safe because it has exactly one direct caller in the whole library.
+# battle result template leaves the box rewards empty, so true only advertises
+# phantom slots. Forcing the function to return 0 affects its single caller.
 NO_WIN_BOX_SITE = 0x8DA77C
 NO_WIN_BOX_ORIGINAL = bytes.fromhex("e80300aa09b04239")  # mov x8, x0 ; ldrb w9, [x0, #0xac]
 NO_WIN_BOX_PATCHED = bytes.fromhex("e0031f2ac0035fd6")  # mov w0, wzr ; ret
+# Both Subjugation callers share this box gate after normal rewards are granted.
+# Preserve the original signed >= 1 checks on both box mappings at 0xa4/0xa8.
+# A nonnegative gene ID at 0x7c then takes the stock no-box exit at 0x8d01ac.
+SWEEP_GENE_BOX_SITE = 0x8CFC7C
+SWEEP_GENE_BOX_ORIGINAL = bytes.fromhex("c8a640b91f0500714b290054d5aa40b9bf060071eb280054")
+SWEEP_GENE_BOX_PATCHED = bytes.fromhex("c8d654291f050071a8aa417a2b290054c97e40b9e928f836")
 
 # ---------------------------------------------------------------------------
 # Hero EXP Cap & Un-transcended Limit Break Floor (always-on bug fix)
@@ -1800,6 +1812,7 @@ EXPECTED_PATCH_COUNTS = {
     "event_limits_daily": EXPECTED_EVENT_LIMIT_ROWS + 3,
     "mythical_stone_shop": 4,
     "hero_shop_offers": 6,
+    "surprise_transcendence_package": 6,
     "alex_awakening": 1,
     "costume_packages_all": 10,
     "equipment_tier_upgrades": 4,
@@ -1823,6 +1836,7 @@ EXPECTED_PATCH_COUNTS = {
     "battle_arena_save_fix": 1,
     "coocoo_exp_x2": 1,
     "coocoo_level_x2": len(COOCOO_STAGE_LEVELS),
+    "worldboss_full_ship_repair": len(WORLDBOSS_FULL_SHIP_REPAIR_SITES),
     "ship_parts_90_off": sum(
         1 for _offset, values in SHIP_PART_COST_TABLES for value in values if value
     ),
@@ -1840,12 +1854,12 @@ EXPECTED_PATCH_COUNTS = {
     "rune_box_random_roll": len(RUNE_ROLL_SITES) + 2,
     "equipment_lock_fix": 1,
     "equipment_single_mod_stone": 3,
-    "equipment_percent_options": 297,
+    "equipment_percent_options": 597,
     "equipment_upgrade_10_guarantee": 1,
     "limit_break_cost_tenth": LIMIT_BREAK_GOLD_ROWS,
     "limit_break_cost_fixed": LIMIT_BREAK_GOLD_ROWS,
     "soulgear_enchant_always": 1,
-    "no_win_box": 1,
+    "no_win_box": 2,
     "hero_exp_cap": 4,
     "rune_option_quality": 1,
     "lan_redirect": 1,
@@ -1885,6 +1899,7 @@ IDEMPOTENT_PATCHES: frozenset[str] = frozenset({
     "event_limits_daily",
     "mythical_stone_shop",
     "hero_shop_offers",
+    "surprise_transcendence_package",
     "costume_packages_all",
     "equipment_tier_upgrades",
     "event_coin_x10",
@@ -1909,6 +1924,7 @@ IDEMPOTENT_PATCHES: frozenset[str] = frozenset({
     "coocoo_level_x2",
     "crystal_skill_90_off",
     "ship_parts_90_off",
+    "worldboss_full_ship_repair",
     "battle_arena_fix",
     "battle_arena_save_fix",
     "guild_raid_mercenary",
@@ -2094,6 +2110,7 @@ class PatchOptions:
     event_limits_daily: bool = False    # Convert event-limited shop rows to daily reset
     mythical_stone_shop: bool = False  # Mythical Stone and Balance Jade event offers
     hero_shop_offers: bool = False  # Evan and Alex genes, 100 Diamonds
+    surprise_transcendence_package: bool = False  # Surprise Sale offer 75103
     alex_awakening: bool = False  # Original Alex Awakening and Destiny Lance
     alex_rebalance: bool = False  # Rebalance Alex Skills 1-3, Passive, and Awake Thornbush
     costume_packages_all: bool = False  # One copy of each eligible owned costume
@@ -2125,6 +2142,7 @@ class PatchOptions:
     coocoo_exp_x2: bool = False         # Always apply the x2 EXP bonus with coocoos
     coocoo_level_x2: bool = False       # Double the coocoo levels dropped by Coocoo Gardens
     ship_parts_90_off: bool = False     # 90% off Unknown Paradise battleship part upgrades
+    worldboss_full_ship_repair: bool = False  # restore full HP on successful repair
     crystal_skill_90_off: bool = False  # 90% off Unknown Paradise core crystal upgrades
     gem_mining_x10: bool = False        # Paid gem mining rolls award 10 gems
     gem_mining_types: bool = False      # Restrict gem rolls to MP/Counter/Dodge/Hit
@@ -5079,9 +5097,9 @@ def apply_equipment_percent_options(buf: bytearray) -> int:
     """Zeros every flat equipment-option weight and closes the picker fallback.
 
     ``fwt_randoption_rows`` is the table the offline server uses for option
-    rolls.  Rows with ``valueType == 1`` are the flat options (+100 Crit,
-    +50 HP); zeroing their six grade weights removes them from the draw, so
-    only the percentage rows (+10% Crit Rate, +2% HP) remain.  A pool whose
+    rolls. Zeroing the six grade weights of direct and scaled flat rows
+    (client value types 1 and 4) leaves only percentage rows (type 2).
+    A pool whose
     rows are all flat would still be served by the picker's zero-weight
     fallback, so that branch is rewritten as well.
     """
@@ -5478,6 +5496,22 @@ def apply_coocoo_level_x2(buf: bytearray) -> int:
     return changed
 
 
+def apply_worldboss_full_ship_repair(buf: bytearray) -> int:
+    """Restore maximum ship HP through the stock repair paths."""
+    pending = []
+    for site, original, replacement in WORLDBOSS_FULL_SHIP_REPAIR_SITES:
+        offset = seg_offset(site)
+        current = bytes(buf[offset:offset + len(original)])
+        if current == replacement:
+            continue
+        if current != original:
+            raise ValueError(f"Unexpected ship repair instruction at 0x{site:x}")
+        pending.append((offset, replacement))
+    for offset, replacement in pending:
+        _write_bytes(buf, offset, replacement, "full ship repair")
+    return len(pending)
+
+
 def apply_ship_parts_90_off(buf: bytearray) -> int:
     """Applies a 90% discount to the Unknown Paradise battleship part gold upgrade costs."""
     changed = 0
@@ -5779,25 +5813,22 @@ def apply_soulgear_enchant_always(buf: bytearray) -> int:
 
 
 def apply_no_win_box(buf: bytearray) -> int:
-    """Reports is_win_box: false so the client stops listing boxes nothing grants.
-
-    battle_has_mapped_coocoo_box has a single caller, which only chooses between the
-    literals true and false for the result payload's is_win_box field.  The embedded server
-    hardcodes coocoobox_reward: null and coocoobox_reward_list: [] and never inserts a box
-    item, so advertising the box only produces phantom rows in the end-of-battle list.
-    """
-    offset = seg_offset(NO_WIN_BOX_SITE)
-    size = len(NO_WIN_BOX_ORIGINAL)
-    current = bytes(buf[offset:offset + size])
-    if current == NO_WIN_BOX_PATCHED:
-        return 0
-    if current != NO_WIN_BOX_ORIGINAL:
-        raise ValueError(
-            f"Unexpected win box guard at 0x{NO_WIN_BOX_SITE:x}: {current.hex()} "
-            f"(expected {NO_WIN_BOX_ORIGINAL.hex()} or {NO_WIN_BOX_PATCHED.hex()})"
-        )
-    buf[offset:offset + size] = NO_WIN_BOX_PATCHED
-    return 1
+    """Hide phantom battle boxes and disable bonus boxes in hero-gene sweeps."""
+    pending = []
+    for site, original, replacement in (
+        (NO_WIN_BOX_SITE, NO_WIN_BOX_ORIGINAL, NO_WIN_BOX_PATCHED),
+        (SWEEP_GENE_BOX_SITE, SWEEP_GENE_BOX_ORIGINAL, SWEEP_GENE_BOX_PATCHED),
+    ):
+        offset = seg_offset(site)
+        current = bytes(buf[offset:offset + len(original)])
+        if current == replacement:
+            continue
+        if current != original:
+            raise ValueError(f"Unexpected win box guard at 0x{site:x}: {current.hex()}")
+        pending.append((offset, replacement))
+    for offset, replacement in pending:
+        _write_bytes(buf, offset, replacement, "win box guard")
+    return len(pending)
 
 
 def _hero_exp_cap_cave_bytes() -> bytes:
@@ -7039,6 +7070,8 @@ def apply_all_patches(
 
     if options.hero_shop_offers:
         record("hero_shop_offers", apply_hero_shop_offers(so_buf))
+    if options.surprise_transcendence_package:
+        record("surprise_transcendence_package", apply_surprise_transcendence_package(so_buf, seg_offset))
 
     if options.costume_packages_all:
         record("costume_packages_all", apply_costume_packages(so_buf, seg_offset))
@@ -7054,6 +7087,8 @@ def apply_all_patches(
 
     if options.ship_parts_90_off:
         record("ship_parts_90_off", apply_ship_parts_90_off(so_buf))
+    if options.worldboss_full_ship_repair:
+        record("worldboss_full_ship_repair", apply_worldboss_full_ship_repair(so_buf))
 
     if options.crystal_skill_90_off:
         record("crystal_skill_90_off", apply_crystal_skill_90_off(so_buf))

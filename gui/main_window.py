@@ -622,6 +622,7 @@ class MainWindow(tk.Tk):
         self.var_event_limits_daily = tk.BooleanVar(value=True)
         self.var_mythical_stone_shop = tk.BooleanVar(value=True)
         self.var_hero_shop_offers = tk.BooleanVar(value=True)
+        self.var_surprise_transcendence_package = tk.BooleanVar(value=True)
         self.var_alex_awakening = tk.BooleanVar(value=True)
         self.var_alex_rebalance = tk.BooleanVar(value=True)
         self.var_costume_packages_all = tk.BooleanVar(value=True)
@@ -662,6 +663,7 @@ class MainWindow(tk.Tk):
         self.var_coocoo_exp_x2 = tk.BooleanVar(value=True)
         self.var_coocoo_level_x2 = tk.BooleanVar(value=True)
         self.var_ship_parts_90_off = tk.BooleanVar(value=True)
+        self.var_worldboss_full_ship_repair = tk.BooleanVar(value=True)
         self.var_crystal_skill_90_off = tk.BooleanVar(value=True)
         self.var_gem_mining_x10 = tk.BooleanVar(value=True)
         self.var_gem_mining_types = tk.BooleanVar(value=True)
@@ -692,6 +694,7 @@ class MainWindow(tk.Tk):
             (self.var_event_limits_daily, "Daily Event Shop Limits", "Converts event-limited items (3 per event, etc.) to daily resets while keeping their original per-day quantity"),
             (self.var_mythical_stone_shop, "Mythical Stone in Event Shop", "Offers Mythical Stone for 50 event coins, 100 per day; Balance Jade remains available 20 times daily"),
             (self.var_hero_shop_offers, "Evan and Alex Shop Offers", "Unlimited Evan genes for 5 event coins and Alex genes for 1 medal; 100 Diamonds"),
+            (self.var_surprise_transcendence_package, "Surprise Transcendence Package 2", "10 Ultimate and 10 Universal Transcendence Tickets for 500 diamonds"),
             (self.var_alex_awakening, "Alex Awakening: Destiny Lance", "Awaken Alex and unlock Destiny Lance, which damages and swaps places with a boss anywhere on the map"),
             (self.var_alex_rebalance, "Alex Skill, Passive & Awake Rebalance", "Rebalances Alex Skills 1-3, Passive (Knighthood), and upgrades Destiny Lance to create permanent 1-cell Thornbush around the Boss's destination"),
             (self.var_costume_packages_all, "Complete Costume Packages", "Packages 3 and 4 each give one copy of every eligible owned costume; up to 10 purchases per package daily"),
@@ -744,6 +747,7 @@ class MainWindow(tk.Tk):
             (self.var_coocoo_exp_x2, "Coocoo EXP x2 Always", "Always applies the x2 EXP bonus when leveling heroes with coocoo experience items"),
             (self.var_coocoo_level_x2, "Coocoo Level x2", "Doubles the coocoo levels dropped by all 30 Coocoo Garden / Pit of Nephthys stages (final stage 220 -> 440)"),
             (self.var_ship_parts_90_off, "90% Off Battleship Parts (Unknown Paradise)", "Applies a 90% discount to every battleship part gold upgrade in Unknown Paradise"),
+            (self.var_worldboss_full_ship_repair, "Unknown Paradise Full Ship Repair", "Restores full ship HP on successful timed repair, Instant Repair, or revive"),
             (self.var_crystal_skill_90_off, "90% Off Core Crystal Upgrades (Unknown Paradise)", "Reduces the three crystal skill upgrade costs from 50 to 5 Kraken Scales each"),
             (self.var_gem_mining_x10, "Gems x10 (Mining)", "Gem-mining rolls award 10 gems of the same type instead of 1, including the 20-crystal paid roll"),
             (self.var_gem_mining_types, "Gem Type Restriction", "Restricts gem-mining rolls to MP, Counter Rate, Counter Damage, Dodge and Hit Rate (excludes HP/ATK/DEF/CRIT sold in the Special Beginner Package)"),
@@ -1691,6 +1695,7 @@ class MainWindow(tk.Tk):
             event_limits_daily=self.var_event_limits_daily.get(),
             mythical_stone_shop=self.var_mythical_stone_shop.get(),
             hero_shop_offers=self.var_hero_shop_offers.get(),
+            surprise_transcendence_package=self.var_surprise_transcendence_package.get(),
             alex_awakening=self.var_alex_awakening.get(),
             alex_rebalance=self.var_alex_rebalance.get(),
             costume_packages_all=self.var_costume_packages_all.get(),
@@ -1733,6 +1738,7 @@ class MainWindow(tk.Tk):
             coocoo_exp_x2=self.var_coocoo_exp_x2.get(),
             coocoo_level_x2=self.var_coocoo_level_x2.get(),
             ship_parts_90_off=self.var_ship_parts_90_off.get(),
+            worldboss_full_ship_repair=self.var_worldboss_full_ship_repair.get(),
             crystal_skill_90_off=self.var_crystal_skill_90_off.get(),
             gem_mining_x10=self.var_gem_mining_x10.get(),
             gem_mining_types=self.var_gem_mining_types.get(),

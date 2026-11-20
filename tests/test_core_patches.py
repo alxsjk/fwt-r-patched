@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -199,6 +200,7 @@ from core.core_patches import (
     apply_single_black_hammer,
     apply_single_gem_fang,
     apply_summon_rates,
+    apply_worldboss_full_ship_repair,
     encode_arm64_branch,
     seg_offset,
     validate_cave_layout,
@@ -434,7 +436,7 @@ def test_lab_cylinder_x10(reference_buffers):
     assert result.counts == {
         "gold_cylinder_x10": 2,
         "mana_cylinder_x10": 2,
-        "no_win_box": 1,
+        "no_win_box": 2,
         "hero_exp_cap": 4,
     }
     hook_offset = GOLD_CYLINDER_X10_SITE - 0x4000
@@ -452,10 +454,44 @@ def test_lab_cylinder_x10(reference_buffers):
         )
 
 
+@pytest.mark.parametrize("daily_limits", [False, True])
+def test_surprise_transcendence_package_isolates_the_offer(reference_buffers, daily_limits):
+    from core.surprise_transcendence_package import apply_surprise_transcendence_package
+
+    so_bytes, _ = reference_buffers
+    buf = bytearray(so_bytes)
+    if daily_limits:
+        apply_event_limits_daily(buf)
+    baseline = bytes(buf)
+    assert not inspect_native_so(buf)["surprise_transcendence_package"].active
+    assert apply_surprise_transcendence_package(buf, seg_offset) == 6
+    assert apply_surprise_transcendence_package(buf, seg_offset) == 0
+    assert inspect_native_so(buf)["surprise_transcendence_package"].active
+
+    def record(address: int, size: int) -> dict:
+        start = seg_offset(address)
+        return json.loads(buf[start:start + size])
+
+    for address in (0x32589A, 0x51F76D):
+        offer = record(address, 943)
+        assert (offer["shop_code"], offer["price_jewelry"], offer["package_code"]) == (
+            "75103", 500, "103899"
+        )
+        assert offer["limit_type"] == (1 if daily_limits else 4)
+    for address in (0x218A72, 0x298AD3):
+        assert record(address, 187)["shop_code"] == ["65024", "65026"]
+    assert [record(0x2F14E4, 788)[k] for k in ("item_code", "item_count")] == ["130006", 10]
+    assert [record(0x2F17F9, 790)[k] for k in ("item_code", "item_count")] == ["130000", 10]
+
+    for address, size in ((0x24FCF3, 187), (0x4ED014, 187), (0x449A63, 822), (0x449D9A, 777)):
+        start = seg_offset(address)
+        assert buf[start:start + size] == baseline[start:start + size]
+
+
 def test_equipment_percent_options_zeroes_server_flat_weights(reference_buffers):
     so_bytes, _dex_bytes = reference_buffers
     buf = bytearray(so_bytes)
-    assert apply_equipment_percent_options(buf) == 297
+    assert apply_equipment_percent_options(buf) == 597
     assert apply_equipment_percent_options(buf) == 0
     table_offset = seg_offset(RANDOPTION_SERVER_SITE)
     flat_rows = 0
@@ -468,7 +504,7 @@ def test_equipment_percent_options_zeroes_server_flat_weights(reference_buffers)
         if option_id // 1000 in RANDOPTION_SERVER_FLAT_GROUPS:
             flat_rows += 1
             assert weights == (0, 0, 0, 0, 0, 0)
-    assert flat_rows == 296
+    assert flat_rows == 596
     fallback_offset = seg_offset(RANDOPTION_FALLBACK_SITE)
     assert (
         bytes(buf[fallback_offset:fallback_offset + 4])
@@ -499,7 +535,7 @@ def test_equipment_single_mod_stone(reference_buffers):
     )
     assert result.counts == {
         "equipment_single_mod_stone": 3,
-        "no_win_box": 1,
+        "no_win_box": 2,
         "hero_exp_cap": 4,
     }
     server_offset = SINGLE_MOD_STONE_SERVER_SITE - 0x4000
@@ -838,7 +874,7 @@ def test_guild_raid_score_fix_branches_and_caves(reference_buffers):
     result = apply_all_patches(
         so_bytes, dex_bytes, PatchOptions(guild_raid_score_fix=True)
     )
-    assert result.counts == {"guild_raid_score_fix": 2, "no_win_box": 1, "hero_exp_cap": 4}
+    assert result.counts == {"guild_raid_score_fix": 2, "no_win_box": 2, "hero_exp_cap": 4}
 
     start = result.so_bytes[
         GUILD_RAID_START_SITE - 0x4000:GUILD_RAID_START_SITE - 0x4000 + 8
@@ -879,7 +915,7 @@ def test_single_material_features_patch_exact_sites(reference_buffers):
     assert result.counts == {
         "single_black_hammer": 1,
         "single_gem_fang": 5,
-        "no_win_box": 1,
+        "no_win_box": 2,
         "hero_exp_cap": 4,
     }
     assert (
@@ -917,7 +953,7 @@ def test_stamina_potion_1000_site(reference_buffers):
         dex_bytes,
         PatchOptions(stamina_potion_1000=True),
     )
-    assert result.counts == {"stamina_potion_1000": 1, "no_win_box": 1, "hero_exp_cap": 4}
+    assert result.counts == {"stamina_potion_1000": 1, "no_win_box": 2, "hero_exp_cap": 4}
     offset = STAMINA_POTION_1000_SITE - 0x4000
     assert result.so_bytes[offset:offset + len(STAMINA_POTION_1000_REPLACEMENT)] == (
         STAMINA_POTION_1000_REPLACEMENT
@@ -934,7 +970,7 @@ def test_coocoo_exp_x2_and_stamina_half_sites(reference_buffers):
     assert result.counts == {
         "coocoo_exp_x2": 1,
         "stamina_cost_half": 1,
-        "no_win_box": 1,
+        "no_win_box": 2,
         "hero_exp_cap": 4,
     }
     for site, replacement in (
@@ -1000,6 +1036,38 @@ def test_ship_parts_90_off_and_crystal_skill_cost(reference_buffers):
 
     assert apply_ship_parts_90_off(buf) == 0
     assert apply_crystal_skill_90_off(buf) == 0
+
+
+def test_worldboss_full_ship_repair_instructions(reference_buffers):
+    from capstone import CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN, Cs
+
+    so_bytes, _ = reference_buffers
+    buf = bytearray(so_bytes)
+    key = "worldboss_full_ship_repair"
+    assert not inspect_native_so(buf)[key].active
+    assert apply_worldboss_full_ship_repair(buf) == 3
+    assert apply_worldboss_full_ship_repair(buf) == 0
+    assert inspect_native_so(buf)[key].active
+
+    decoder = Cs(CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN)
+    for site, expected in (
+        (0x976048, ("mov", "x24, x21")),
+        (0x849D60, ("fmov", "d1, #1.00000000")),
+        (0x97704C, ("fmov", "d1, #1.00000000")),
+    ):
+        offset = seg_offset(site)
+        assert list(decoder.disasm_lite(bytes(buf[offset:offset + 4]), site))[0][2:] == expected
+
+    offset = seg_offset(0x97704C)
+    buf[offset:offset + 4] = so_bytes[offset:offset + 4]
+    assert not inspect_native_so(buf)[key].active
+
+    corrupt = bytearray(so_bytes)
+    corrupt[offset:offset + 4] = b"\x00" * 4
+    before = bytes(corrupt)
+    with pytest.raises(ValueError, match="Unexpected ship repair instruction"):
+        apply_worldboss_full_ship_repair(corrupt)
+    assert bytes(corrupt) == before
 
 
 def test_gem_mining_x10(reference_buffers):
@@ -1116,6 +1184,7 @@ def test_reference_all_patch_counts_and_egl_integrity(reference_buffers):
         coocoo_exp_x2=True,
         coocoo_level_x2=True,
         ship_parts_90_off=True,
+        worldboss_full_ship_repair=True,
         crystal_skill_90_off=True,
         gem_mining_x10=True,
         gem_mining_types=True,
@@ -1160,6 +1229,7 @@ def test_reference_all_patch_counts_and_egl_integrity(reference_buffers):
         "coocoo_exp_x2": 1,
         "coocoo_level_x2": len(COOCOO_STAGE_LEVELS),
         "ship_parts_90_off": 41,
+        "worldboss_full_ship_repair": 3,
         "crystal_skill_90_off": 1,
         "gem_mining_x10": 1,
         "gem_mining_types": 2,
@@ -1179,10 +1249,10 @@ def test_reference_all_patch_counts_and_egl_integrity(reference_buffers):
         # The max-quality bias rewrites the same table first, so only the flat
         # rows it still weights (35 of the 296) are left for this pass, plus
         # the zero-weight picker fallback branch.
-        "equipment_percent_options": 36,
+        "equipment_percent_options": 66,
         "equipment_upgrade_10_guarantee": 1,
         "soulgear_enchant_always": 1,
-        "no_win_box": 1,
+        "no_win_box": 2,
         "hero_exp_cap": 4,
         "rune_option_quality": 1,
         "event_coin_x10": 1,
@@ -1272,7 +1342,7 @@ def test_reference_alternate_profile_and_no_cave_collisions(reference_buffers):
         "rune_box_random_roll": len(RUNE_ROLL_SITES) + 2,
         "equipment_lock_fix": 1,
         "soulgear_enchant_always": 1,
-        "no_win_box": 1,
+        "no_win_box": 2,
         "hero_exp_cap": 4,
         "rune_option_quality": 1,
         "gold_cylinder_x10": 2,

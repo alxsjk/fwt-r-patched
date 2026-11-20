@@ -124,7 +124,7 @@ All 6 IDs were audited as unused across all 8 localized `skilleffecttable*.unity
   - Geometry from Sehee Skill 2 (`1056851`): `(5, 13, 5, 19)`.
   - Slots: `_effect01 = 0x10018101` (`-10%~-30%` Atk), `_effect02 = 17174567` (DoT), `_effect03 = 0x10018102` (Co-op `10%~25%`), `_effect04 = 16846914` (Damage).
 - **Skill 3 (`1048964` — *Giga-break*):**
-  - Geometry from Lance Skill 2 (`1049219`): `(2, 0, 3, 8)`.
+  - Cast range from Jakyak's *Do not Chase me* (`1056868`): `(3, 13)`. Alex's AoE remains `(3, 8)`.
   - Slots: `_effect01 = 17371140` (Stun), `_effect02 = 0x10018102` (Co-op `10%~25%`), `_effect03 = 16846915` (Damage), `_effect04 = -1`.
 - **Passive (`1048963` — *Knighthood*):**
   - Replaces `26742786` (crit damage taken reduction) while keeping the debuff bonus (`+10%`) natively in `_effect01`.
@@ -152,7 +152,7 @@ JAVA_HOME=/path/to/jdk21 .venv/bin/python -m tools.lab_alex_skill_rebalance
 1. **Hero sheet (Lv 1 & Lv 10):** verify English tooltips and scaling (`10~30%` Atk down, `10~25%` co-op Final Power, `10%` vs debuffed, `20%` co-op, `2` living allies, `5~25%` incoming damage reduction).
 2. **Skill 1 (`1048961`):** verify Phantom `(3, 13, 3, 19)` targeting grid + Ian co-op bonus *(validated in Trial 1)*.
 3. **Skill 2 (`1048962`):** verify Sehee `(5, 13, 5, 19)` grid, percentage Attack debuff (`D_SkillIcon_18`), and co-op damage increase.
-4. **Skill 3 (`1048964`):** verify Lance `(2, 0, 3, 8)` grid, Stun, and co-op damage increase.
+4. **Skill 3 (`1048964`):** compare the cast grid with Jakyak's *Do not Chase me* and confirm Alex's existing AoE, Stun, and co-op damage increase.
 5. **Passive (`1048963`):** verify `+10%` damage against debuffed enemies, `+20%` co-op bonus, and `-5%~-25%` damage reduction with `>= 2` living allies vs. `< 2` living allies.
 6. **Awake (`0x100185` — *Destiny Lance*):** verify Alex lands on the Boss's original cell, 1-cell Thornbush terrain conversion centers on the Boss's destination cell (`boss_dest_tile`), persistence across turns (`_turnEnd = 99`), and adjacent minions are untouched.
-7. **Non-regression:** confirm Ian, Sehee, Lance, and Phantom remain unmodified.
+7. **Non-regression:** confirm Ian, Sehee, Jakyak, and Phantom remain unmodified.

@@ -7,7 +7,32 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.5.53] - 2026-11-20
+
 ### Added
+- **Surprise Transcendence Package 2 (02.10)**: Offer 75103 costs 500 diamonds and delivers ten Ultimate Equipment Transcendence Tickets and ten Universal Transcendence Tickets. Other promotions keep the stock package.
+
+### Fixed
+- **Hero-gene Subjugation rewards (08.03)**: Disable the Coocoo Box bonus branch in stages that drop hero genes. Regular drops, gene rewards, and bonuses in stages without genes retain their existing rules.
+
+### Known Issues
+- **[KB-001](docs/KNOWN_BUGS.md) — Mythical Stone display resets after restart (02.07)**: purchases from the Special Product offer are charged, delivered, persisted by the server, and usable in the same session, but the inventory and costume enchant screens show zero after restarting the game. No stones are lost. Workaround: spend the stones in the session in which they are bought.
+
+## [2.5.52] - 2026-11-20
+
+### Fixed
+- **Percent-only equipment options (03.05)**: Exclude scaled flat options such as +267 Counter Damage and +67 Defense. Combining this filter with 03.02 still gives maximum-quality rolls for the eligible percentage options.
+
+## [2.5.51] - 2026-11-20
+
+### Fixed
+- **Equipment option potions**: The release enables both percentage-only rolls and maximum-quality ("always pink") rolls. Existing locked options retain their values.
+
+### Changed
+- **Alex Skill 3 (`--alex-rebalance`)**: Giga-break now uses the cast range of Jakyak's *Do not Chase me* and retains Alex's existing area of effect.
+
+### Added
+- **Unknown Paradise full ship repair (06.10)**: Restore the ship to full HP on the first eligible timed repair tick, Instant Repair, or revive.
 - **Cipher key extractor ([tools/extract_env_keys.py](tools/extract_env_keys.py))**: one-command setup for the `.env` cipher variables. The secrets live inside the game's own asset pack: a 484-byte Unity `TextAsset` (`DefineResources/Assembly`, inside `assets/bin/Data/datapack.unity3d`) whose blob embeds its own single-DES key and IV, so no secret values ship with the repository. Validated against the reference APK (`fwt_0.682_offline_v1574.apk`, 966 MB): the blob is recovered with UnityPy, decrypts to 15 secret strings and maps to the 10 cipher variables (`FWT_CACHE_CRYPT_*`, `FWT_DATATABLE_CRYPT_*` including the `_REVERSED` forms, `FWT_NETWORK_CRYPT_*`, `FWT_ID_KEY_*`) following the documented `.env` conventions. Prints key lengths only, never the values. Adds unit tests (synthetic blob round-trip, `.env` merge) and an integration test gated on the reference APK; the README quick start documents the step.
 - **GitHub Authorial Governance Workflows**: added `.github/workflows/pr-policy.yml`, `.github/workflows/pr-policy-comment.yml`, and `.github/workflows/issue-triage.yml`, updated issue/PR templates and `CONTRIBUTING.md` to enforce the issue-first `needs-triage` -> `approved` contribution workflow, and added fork-safety tests in `tests/test_github_workflows.py`.
 
