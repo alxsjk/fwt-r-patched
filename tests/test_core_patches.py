@@ -470,7 +470,8 @@ def test_surprise_transcendence_package_isolates_the_offer(reference_buffers, da
 
     def record(address: int, size: int) -> dict:
         start = seg_offset(address)
-        return json.loads(buf[start:start + size])
+        data: dict = json.loads(buf[start:start + size])
+        return data
 
     for address in (0x32589A, 0x51F76D):
         offer = record(address, 943)
