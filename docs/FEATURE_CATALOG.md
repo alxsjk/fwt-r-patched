@@ -99,6 +99,7 @@ IDs are stable references, not positions: never renumber or reuse an ID. If a fe
 | 07.06 | Guild Raid Fire Support 100% HP and odd-turn auto-cast | `--guild-raid-fire-support` | `guild_raid_fire_support` | `var_guild_raid_fire_support` | Yes |
 | 07.07 | Guild Raid skills maxed (1M Shelling, 100% DR/HP/MP, 20 dispels) | `--guild-raid-skills-max` | `guild_raid_skills_max` | `var_guild_raid_skills_max` | Yes |
 | 07.08 | Guild Raid boss 0% counterattack rate | `--guild-raid-boss-no-counter` | `guild_raid_boss_no_counter` | `var_guild_raid_boss_no_counter` | Yes |
+| 07.09 | Guild Raid Absolute Protection persists for all hits (experimental — blocked by AppSealing anti-tamper) | `--guild-raid-protection-persist` | `guild_raid_protection_persist` | `var_guild_raid_protection_persist` | No (blocked) |
 
 07.03 uses the configured weekday hero; if absent or invalid, it keeps the
 selected guild mercenary. A hero without a costume remains valid. Socketed gem
@@ -122,7 +123,8 @@ See the [Awakening guide](HERO_AWAKENING_GUIDE.md) and the [Skill rebalance guid
 | ID | Feature | CLI | PatchOptions field | GUI variable | `--all` |
 |---|---|---|---|---|---|
 | 12.01 | Alex Awakening: Destiny Lance | `--alex-awakening` | `alex_awakening` | `var_alex_awakening` | Yes |
-| 12.02 | Alex Skill, Passive & Awake Rebalance (Giga-break uses Jakyak's cast range and retains Alex's AoE) | `--alex-rebalance` | `alex_rebalance` | `var_alex_rebalance` | Yes |
+| 12.02 | Alex Skill, Passive & Awake Rebalance (Skill 1 = Skill 2 geometry; Skill 2 reduces Defense) | `--alex-rebalance` | `alex_rebalance` | `var_alex_rebalance` | Yes |
+| 12.03 | Alex's Hero's Mark — The Unbroken Lance | `--alex-heros-mark` | `alex_heros_mark` | `var_alex_heros_mark` | Yes |
 
 ## Development options
 

@@ -30,16 +30,16 @@ from core.alex_rebalance import (
     AWAKE_EFFECT_IDS,
     AWAKE_THORNBUSH_TOOLTIP,
     BASE_EFFECT_IDS,
-    DONOR_ATK_RATE_DOWN_EFFECT,
     DONOR_COOP_UTILITY_EFFECT,
+    DONOR_DR_DOWN_RATE_EFFECT,
     DONOR_PASSIVE_ALL_DMG_REDUCE,
     DONOR_PASSIVE_FINAL_POWER_BUFF,
     DONOR_SWAP_EFFECT_ID,
     DONOR_TILE_CHANGE_THORNBUSH,
     IAN_COOP_EFFECT_ID,
-    NEW_ATK_RATE_DOWN_EFFECT_ID,
     NEW_AWAKE_THORNBUSH_ID,
     NEW_COOP_UTILITY_10_25_ID,
+    NEW_DR_DOWN_RATE_EFFECT_ID,
     NEW_PASSIVE_ALLY_DR_5_25_ID,
     NEW_PASSIVE_COOP_20_ID,
     NEW_PASSIVE_DEBUFF_10_ID,
@@ -68,7 +68,7 @@ def _donor_map() -> dict[int, dict[str, object]]:
     return {
         donor_id: {**template, "_skillEffectId": donor_id}
         for donor_id in (
-            DONOR_ATK_RATE_DOWN_EFFECT,
+            DONOR_DR_DOWN_RATE_EFFECT,
             DONOR_COOP_UTILITY_EFFECT,
             DONOR_PASSIVE_FINAL_POWER_BUFF,
             DONOR_PASSIVE_ALL_DMG_REDUCE,
@@ -83,13 +83,13 @@ def test_expected_skill_updates_geometry_effects_and_tooltips() -> None:
     ko_path = "files/Resources/datatable/skilldatakorean.unity3d"
 
     s1 = expected_skill_updates(en_path, ALEX_SKILL_1_ID, "stock")
-    assert (s1["_range"], s1["_skillRangeType"], s1["_skillEffectRange"], s1["_skillEffectRangeType"]) == (3, 13, 3, 19)
+    assert (s1["_range"], s1["_skillRangeType"], s1["_skillEffectRange"], s1["_skillEffectRangeType"]) == (5, 13, 5, 19)
     assert s1["_effect02"] == IAN_COOP_EFFECT_ID
     assert "@3-3" in s1["_tooltip"]
 
     s2 = expected_skill_updates(en_path, ALEX_SKILL_2_ID, "stock")
     assert (s2["_range"], s2["_skillRangeType"], s2["_skillEffectRange"], s2["_skillEffectRangeType"]) == (5, 13, 5, 19)
-    assert s2["_effect01"] == NEW_ATK_RATE_DOWN_EFFECT_ID
+    assert s2["_effect01"] == NEW_DR_DOWN_RATE_EFFECT_ID
     assert s2["_effect03"] == NEW_COOP_UTILITY_10_25_ID
 
     s3 = expected_skill_updates(en_path, ALEX_SKILL_3_ID, "stock")
@@ -131,8 +131,8 @@ def test_build_rebalance_effect_rows_standalone_and_combined() -> None:
     by_id = {row["_skillEffectId"]: row for row in standalone}
 
     # Check Lv 1 and Lv 10 (val + 9 * factor) float32 behavior
-    atk = by_id[NEW_ATK_RATE_DOWN_EFFECT_ID]
-    assert atk["_effectValue"] + 9.0 * atk["_effectValueFactor"] == pytest.approx(-0.30, abs=1e-6)
+    dr_down = by_id[NEW_DR_DOWN_RATE_EFFECT_ID]
+    assert dr_down["_effectValue"] + 9.0 * dr_down["_effectValueFactor"] == pytest.approx(-0.30, abs=1e-6)
 
     coop_10_25 = by_id[NEW_COOP_UTILITY_10_25_ID]
     assert coop_10_25["_precondition"] == 78

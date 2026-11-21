@@ -1,6 +1,6 @@
 # FWT Reborn - Offline Client Patcher & Modding Suite
 
-**Version 2.5.53** · [Changelog](CHANGELOG.md) · [Technical documentation](docs/SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md) · [Contributing](CONTRIBUTING.md)
+**Version 2.5.54** · [Changelog](CHANGELOG.md) · [Technical documentation](docs/SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md) · [Contributing](CONTRIBUTING.md)
 
 Cross-platform desktop application (**Windows & Linux**) in Python for applying deterministic patches directly to the offline Korean APK of Fantasy War Tactics (**0.682 v1574**), eliminating the need to compile a separate server when playing 100% offline on a phone or emulator with all quality-of-life enhancements enabled.
 
@@ -48,12 +48,12 @@ The interface and the [complete feature catalog](docs/FEATURE_CATALOG.md) share 
 04. **Runes** — 04.01–04.05
 05. **Gems** — 05.01–05.05
 06. **Resources and upgrade costs** — 06.01–06.10
-07. **Battle Arena and Guild Raid** — 07.01–07.08
+07. **Battle Arena and Guild Raid** — 07.01–07.09
 08. **Language, network and build** — 08.01–08.06
 09. **Development: telemetry and controls** — 09.01–09.06
 10. **Development: tools** — 10.01–10.05
 11. **Development: experimental** — 11.01–11.02
-12. **Original hero modifications** — 12.01–12.02
+12. **Original hero modifications** — 12.01–12.03
 
 The catalog lists each CLI flag, GUI variable and `PatchOptions` or `DevOptions` field, including summon alternatives, LAN mode, alignment, the always-on Coocoo fix and separate development controls. Feature 02.08 makes costume packages 3 and 4 award one copy of each eligible owned costume, collectable from shop mail, up to 10 purchases per package per day. Feature 03.11 makes one appropriate hammer finish the current equipment tier (+10 → +15, +15 → +20, +20 → +26), with the confirmation and stat preview showing the target. Descriptions, addresses and historical evidence remain in [PATCH_SPEC.md](docs/PATCH_SPEC.md).
 

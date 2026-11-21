@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 APP_NAME = "FWT Reborn Patch"
-APP_VERSION = "2.5.53"
+APP_VERSION = "2.5.54"
 BUILD_IDENTITY_ENTRY = "assets/fwt_re_patched_build_type.txt"
 APP_VERSION_DISPLAY = f"v{APP_VERSION}"
 APP_RELEASE_DATE = "2026-11-20"

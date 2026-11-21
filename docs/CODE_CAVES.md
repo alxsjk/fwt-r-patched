@@ -67,12 +67,15 @@ Every cave below is checked for non-overlap by `validate_cave_layout()` in
 | `0xB2AB00..0xB2ABC0` | 192 B | same | `wb_daily_kraken` (`mode_drops_x10`, fixed 500 Kraken Scales per Unknown Paradise attack) |
 | `0xB2ABC0..0xB2AD08` | 328 B | same | `guild_raid_fire_support` (07.06: post-Covault installer `0xAB335C` -> odd-turn gate at `0x018E7060`) |
 | `0xB2AD10..0xB2AD68` | 88 B | same | `single_gem_fang` (05.05: unlock holes 1..3 via `0x8ADE80` -> `update_equipment_hole_json`) |
-| `0xB2AD70..0xB2AE18` | 168 B | same | `hero_exp_cap` (08.06: EXP clamp helper + stage/Tower/expedition trampolines; `0xB2AE18..0xB2B098` free tail) |
+| `0xB2AD70..0xB2AE18` | 168 B | same | `hero_exp_cap` (08.06: EXP clamp helper + stage/Tower/expedition trampolines; `0xB2AE8C..0xB2B098` free tail) |
+| `0xB2AE18..0xB2AFDC` | 452 B | same | `guild_raid_protection_persist` (07.09: mid-function installer at `0xAB3348` calling `PATCH_IL2CPP_HELPER` for the UseDamageReduceEffect client swap, with diagnostic logging and a direct-write self-healing fallback) |
+| `0xB2AFDC..0xB2B068` | 140 B | same (`0xB29EBC..0xB2B098`) | `alex_heros_mark` (12.03: five 28-byte `fwt_valid_soulgear_idx::kIds` loop-exit stubs served from the post-Covault installer at `0xAB3304`) |
 | `0xB33314..0xB33624` | 784 B | `itanium_demangle::NewExpr::printLeft` (`0xB33314..0xB3384C`) | `campaign_gold` (gold/gene/mana), `recycle_completion_ticket` (+ tail), `event_coin`, `expedition_x10`, `dimension_x10`, `patch_flags`, `guild_raid_client`, `guild_raid_sentinel` |
 | `0xB33634..0xB33724` | 240 B | same (shared exclusive slot) | `battle_arena_save` (`0xB33634..0xB3367C`) + `single_gem_fang_client` (`0xB3367C..0xB336C8`) + `guild_raid_mercenary_client` (`0xB336D8..0xB33724`) |
 | `0xB33724..0xB3384C` | 296 B | same | `campaign_gold` (items at `0xB33734`), `dimension_gene_x10`, `recycle_reward_flag`, `gem_mining_x10`, `honor_points_x2`; `0xB337B4..0xB33800` is the One Modification Stone client cave (0x4C); `0xB33724..0xB33734` (16 B) and `0xB33800..0xB33820` (32 B) are free |
 | `0xB34860..0xB34F50` | 1,776 B | `itanium_demangle::AbstractManglingParser::parseUnnamedTypeName` (`0xB34860..0xB34F78`) | `guild_raid_mercenary`; `gold_cylinder_x10` at `0xB34CD8..0xB34CE4`; `event_shop_count` at `0xB34CE4..0xB34D44`; Alex Awakening (`12.01`) at `0xB34D44..0xB34F50` |
 | `0xB2EA8C..0xB2FAA0` | 4,116 B | `itanium_demangle::AbstractManglingParser::parseExpr` | Alex Awakening (`12.01`) client hooks (currently 4,012 B used) |
+| `0xB2FAA0..0xB2FBA0` | 256 B | same (`0xB2EA8C..0xB2FB9F`) | `alex_heros_mark` (12.03: post-Covault installer at `0xAB3304` plus the `Skill::GetCurrentCoolTime` cooltime-0 payload; 243 B used) |
 | `0xB3981C..0xB39860` | 68 B | `itanium_demangle::DtorName::printLeft` (`0xB3981C..0xB398AC`) | `rune_box_random_roll` (xorshift32 `-slot` + type seed; 76 B free) |
 
 ### Writable Scratch Slots
@@ -173,7 +176,7 @@ Both `dev_dispatch_log` (`0xB29EBC..0xB2A1BC`) and `dev_handler_timing`
 (`0xB33314..0xB3384C`) is completely full. Future hooks should target:
 
 1. the remaining tail of `AbstractManglingParser::parseType`
-   (`0xB2AE18..0xB2B098`, **640 B** free after rune, costume package, equipment tier, Unknown Paradise daily scales, Fire Support, single Dragon Fang, and Hero EXP cap allocations);
+   (`0xB2B068..0xB2B098`, **48 B** free after rune, costume package, equipment tier, Unknown Paradise daily scales, Fire Support, single Dragon Fang, Hero EXP cap, Absolute Protection persistence and Alex's Hero's Mark allocations);
 2. the remaining tail of `AbstractManglingParser::parseUnnamedTypeName`
    (`0xB34F50..0xB34F78`, **40 B** after the Alex reservation);
 3. other verified `demangler-only` candidates from `tools/dead_code_map.py`
@@ -192,6 +195,36 @@ current client code bytes and `0xB34E64..0xB34F24`. The cost-row tail
 `0xB34F24..0xB34F50` was not included in that session. The client and server
 regions are only candidates under the demangler-excluded static profile;
 surviving a normal session does not prove safety in error or unwind paths.
+
+### Alex's Hero's Mark (12.03)
+
+Feature `12.03` reserves `0xB2AFDC..0xB2B068` (140 B) for five
+`fwt_valid_soulgear_idx::kIds` stubs and `0xB2FAA0..0xB2FBA0` (256 B, 243 B
+used) for the client cave in the free tails of `parseType` and `parseExpr`.
+
+- **Server side**: `fwt_valid_soulgear_idx::kIds` is inlined at five call sites
+  (`0x7EBDEC`, `0x7EC814`, `0x8B08A4`, `0x9A027C`, `0xA1B42C`); each loop-exit
+  branch is redirected to a 28-byte stub that also accepts the new mark id.
+- **Client side**: the installer hooks `0xAB3304` — the `cbz w19` that splits
+  the covault finalization flow's common exit path — and calls
+  `PATCH_IL2CPP_HELPER` to replace the four-word prologue of
+  `Skill::GetCurrentCoolTime` (client RVA `0x16064B4`) with an absolute
+  trampoline into the cave payload. The payload returns cooltime `0` when the
+  active Soul Gear mark is level 10, otherwise replays the displaced prologue
+  and continues at `0x16064C4`.
+- `0xAB3304` was chosen after `0xAB337C` proved to collide with
+  `battle_arena_save_fix` (25b): both features rewrote the same `add sp, sp,
+  #0xc50`, so a combined build failed validation with `Unexpected Battle Arena
+  late site 0xab337c`. `0xAB3304` is upstream of the whole epilogue chain and
+  every boot passes through it in both directions, so the installer returns to
+  `0xAB3308` when `w19 != 0` and branches to `0xAB335C` when `w19 == 0`. The
+  block rewrites `x0`–`x5` immediately after the site, so the installer is free
+  to clobber them and keeps only `x19`/`x20` (the two counters the flow carries)
+  intact.
+- The installer validates the stock `cbz` word (`d3020034`) before mutating and
+  the inspector checks the hook, both caves and all five server stubs.
+  Instruction-level emulation covers both branch outcomes, the missing
+  `libil2cpp` base skip, and stack balance.
 
 ### Complete Costume Packages (02.08)
 

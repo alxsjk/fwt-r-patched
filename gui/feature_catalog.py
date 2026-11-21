@@ -117,6 +117,13 @@ FEATURE_GROUPS = (
             "--guild-raid-boss-no-counter",
             "Guild Raid boss 0% counterattack rate",
         ),
+        Feature(
+            "07.09",
+            "guild_raid_protection_persist",
+            "var_guild_raid_protection_persist",
+            "--guild-raid-protection-persist",
+            "Guild Raid Absolute Protection persists for all hits (experimental — blocked by AppSealing anti-tamper)",
+        ),
     )),
     FeatureGroup("08", "Language, network and build", (
         Feature("08.01", "english_localization", "var_english", "--english", "English localization"),
@@ -128,7 +135,8 @@ FEATURE_GROUPS = (
     )),
     FeatureGroup("12", "Original hero modifications", (
         Feature("12.01", "alex_awakening", "var_alex_awakening", "--alex-awakening", "Alex Awakening: Destiny Lance"),
-        Feature("12.02", "alex_rebalance", "var_alex_rebalance", "--alex-rebalance", "Alex Skill, Passive & Awake Rebalance"),
+        Feature("12.02", "alex_rebalance", "var_alex_rebalance", "--alex-rebalance", "Alex Skill, Passive & Awake Rebalance (Skill 1 = Skill 2 geometry; Skill 2 reduces Defense)"),
+        Feature("12.03", "alex_heros_mark", "var_alex_heros_mark", "--alex-heros-mark", "Alex's Hero's Mark — The Unbroken Lance"),
     )),
 )
 

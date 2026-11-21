@@ -387,6 +387,8 @@ def run_cli(args: argparse.Namespace) -> int:
         event_coin_x10=(args.all or args.event_coin_x10),
         guild_raid_score_fix=(args.all or args.guild_raid_score_fix),
         guild_raid_fire_support=(args.all or args.guild_raid_fire_support),
+        guild_raid_protection_persist=args.guild_raid_protection_persist,
+        alex_heros_mark=(args.all or args.alex_heros_mark),
         guild_raid_skills_max=(args.all or args.guild_raid_skills_max),
         guild_raid_boss_no_counter=(args.all or args.guild_raid_boss_no_counter),
         single_black_hammer=(args.all or args.single_black_hammer),
@@ -661,6 +663,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--surprise-transcendence-package", action="store_true", help="Offer 10 Ultimate and 10 Universal Transcendence Tickets for 500 diamonds in Surprise Sale package 2")
     parser.add_argument("--alex-awakening", action="store_true", help="Enable Alex's original Awakening and Destiny Lance")
     parser.add_argument("--alex-rebalance", action="store_true", help="Rebalance Alex Skills 1-3, Passive, and Destiny Lance 1-cell Thornbush")
+    parser.add_argument("--alex-heros-mark", action="store_true", help="Give Alex a Hero's Mark (The Unbroken Lance): Destiny Lance +25%% per mark level and first-turn cast at Lv10; team-wide set effects")
     parser.add_argument("--costume-packages-all", action="store_true", help="Give one copy of each eligible owned costume from packages 3 and 4, up to ten times daily per package")
     parser.add_argument(
         "--recycle-six-star",
@@ -706,6 +709,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--guild-raid-boss-no-counter",
         action="store_true",
         help="Set Guild Raid boss counterattack rate to 0%% (down from 300 / 3%%)",
+    )
+    parser.add_argument(
+        "--guild-raid-protection-persist",
+        action="store_true",
+        help="Make Absolute Protection reduce every hit on protected allies until its turn expiry instead of only the first hit",
     )
     parser.add_argument("--single-black-hammer", action="store_true", help="Use 1 black hammer per +16..+26 transcendence attempt")
     parser.add_argument("--equipment-tier-upgrades", action="store_true", help="Use one hammer to complete an equipment transcendence tier")

@@ -20,6 +20,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from core.alex_heros_mark import (
+    ALEX_MARK_CLIENT_CAVE_MAX_SIZE,
+    ALEX_MARK_CLIENT_CAVE_VADDR,
+    ALEX_MARK_SERVER_CAVE_SIZE,
+    ALEX_MARK_SERVER_CAVE_VADDR,
+    apply_alex_heros_mark_so,
+)
 from core.costume_packages import CAVES as COSTUME_PACKAGE_CAVES
 from core.costume_packages import apply_costume_packages
 from core.dex_smali import (
@@ -37,6 +44,13 @@ from core.guild_raid_fire_support import (
     CAVE_VADDR as GUILD_RAID_FIRE_SUPPORT_CAVE_VADDR,
 )
 from core.guild_raid_fire_support import apply_guild_raid_fire_support
+from core.guild_raid_protection_persist import (
+    CAVE_SIZE as GUILD_RAID_PROTECTION_PERSIST_CAVE_SIZE,
+)
+from core.guild_raid_protection_persist import (
+    CAVE_VADDR as GUILD_RAID_PROTECTION_PERSIST_CAVE_VADDR,
+)
+from core.guild_raid_protection_persist import apply_guild_raid_protection_persist
 from core.hero_shop_offers import apply_hero_shop_offers
 from core.mythical_shop import apply_mythical_shop
 from core.surprise_transcendence_package import apply_surprise_transcendence_package
@@ -1814,6 +1828,7 @@ EXPECTED_PATCH_COUNTS = {
     "hero_shop_offers": 6,
     "surprise_transcendence_package": 6,
     "alex_awakening": 1,
+    "alex_heros_mark": 8,
     "costume_packages_all": 10,
     "equipment_tier_upgrades": 4,
     "recycle_six_star": RECYCLE_SIX_STAR_EXPECTED_ROWS,
@@ -1829,6 +1844,7 @@ EXPECTED_PATCH_COUNTS = {
     "event_coin_x10": 1,
     "guild_raid_score_fix": 2,
     "guild_raid_fire_support": 2,
+    "guild_raid_protection_persist": 2,
     "single_black_hammer": 1,
     "single_gem_fang": 5,
     "upgrade_no_fail_above_20": 5,
@@ -1930,6 +1946,8 @@ IDEMPOTENT_PATCHES: frozenset[str] = frozenset({
     "guild_raid_mercenary",
     "guild_raid_reward_x10",
     "guild_raid_fire_support",
+    "guild_raid_protection_persist",
+    "alex_heros_mark",
     "dev_log_dispatch",
     "dev_build_marker",
     "dev_dispatch_hook",
@@ -2159,6 +2177,8 @@ class PatchOptions:
     guild_raid_fire_support: bool = False  # Fire Support 100% HP + odd-turn auto-cast
     guild_raid_skills_max: bool = False    # Max remaining 3 Guild Raid skills (1M/100%)
     guild_raid_boss_no_counter: bool = False  # Zero Guild Raid boss counter rate (0%)
+    guild_raid_protection_persist: bool = False  # Absolute Protection DR covers all hits until expiry
+    alex_heros_mark: bool = False  # Alex's Hero's Mark "The Unbroken Lance" (12.03)
     lan_redirect: bool = False       # Redirect loopback to LAN server
     server_ip: str = "127.0.0.1"     # Target LAN IP (if lan_redirect enabled)
     server_port: int = 8010          # Target LAN port (if lan_redirect enabled)
@@ -3545,6 +3565,21 @@ def validate_cave_layout() -> None:
         "guild_raid_fire_support",
         GUILD_RAID_FIRE_SUPPORT_CAVE_VADDR,
         GUILD_RAID_FIRE_SUPPORT_CAVE_VADDR + GUILD_RAID_FIRE_SUPPORT_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "guild_raid_protection_persist",
+        GUILD_RAID_PROTECTION_PERSIST_CAVE_VADDR,
+        GUILD_RAID_PROTECTION_PERSIST_CAVE_VADDR + GUILD_RAID_PROTECTION_PERSIST_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "alex_heros_mark_server",
+        ALEX_MARK_SERVER_CAVE_VADDR,
+        ALEX_MARK_SERVER_CAVE_VADDR + ALEX_MARK_SERVER_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "alex_heros_mark_client",
+        ALEX_MARK_CLIENT_CAVE_VADDR,
+        ALEX_MARK_CLIENT_CAVE_VADDR + ALEX_MARK_CLIENT_CAVE_MAX_SIZE,
     ))
     common_ranges.append((
         "single_gem_fang_all_holes",
@@ -7183,6 +7218,18 @@ def apply_all_patches(
         record(
             "guild_raid_fire_support",
             apply_guild_raid_fire_support(so_buf, seg_offset),
+        )
+
+    if options.guild_raid_protection_persist:
+        record(
+            "guild_raid_protection_persist",
+            apply_guild_raid_protection_persist(so_buf, seg_offset),
+        )
+
+    if options.alex_heros_mark:
+        record(
+            "alex_heros_mark",
+            apply_alex_heros_mark_so(so_buf, seg_offset),
         )
 
     if options.single_black_hammer:

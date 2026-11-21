@@ -1659,6 +1659,7 @@ def _patch_resources_zip_file(
         return raw_zip, None
 
     replacements: dict[str, bytes] = {}
+    archive_additions: dict[str, bytes] = {}
     failures: list[str] = []
     with zipfile.ZipFile(raw_zip, "r") as archive:
         for info in archive.infolist():
@@ -2385,6 +2386,29 @@ def _patch_resources_zip_file(
             except Exception as exc:
                 failures.append(f"Alex Rebalance resources: {exc}")
 
+        if options.alex_heros_mark:
+            from core.alex_heros_mark import prepare_alex_heros_mark_assets
+
+            try:
+                mark_replacements, mark_additions = prepare_alex_heros_mark_assets(
+                    archive,
+                    existing_replacements=replacements,
+                )
+                if mark_replacements:
+                    replacements.update(mark_replacements)
+                    if log_fn:
+                        log_fn(
+                            f"Prepared Alex's Hero's Mark in {len(mark_replacements)} resource tables"
+                        )
+                elif log_fn:
+                    log_fn("Skipped Alex Hero's Mark: all target tables already updated")
+                if mark_additions:
+                    archive_additions.update(mark_additions)
+                    if log_fn:
+                        log_fn(f"Alex Hero's Mark icon addition: {list(mark_additions)}")
+            except Exception as exc:
+                failures.append(f"Alex Hero's Mark resources: {exc}")
+
     if failures:
         raise RuntimeError(
             "Requested datatable patch(es) failed; refusing to emit a partially "
@@ -2394,6 +2418,12 @@ def _patch_resources_zip_file(
         return raw_zip, None
     patched_path = work_dir / "fwt_resources_patched.zip"
     _rewrite_zip_entries_to_file(raw_zip, replacements, patched_path)
+    # Append new archive members (e.g., the Hero's Mark icon) after the rewrite
+    # so they are included in the resource contract computation below.
+    if archive_additions:
+        with zipfile.ZipFile(patched_path, "a") as out:
+            for name, data in archive_additions.items():
+                out.writestr(name, data, compress_type=zipfile.ZIP_STORED)
     return patched_path, ResourceContract.from_archive_path(patched_path)
 
 
@@ -2441,6 +2471,7 @@ def needs_resource_archive_patch(options: PatchOptions) -> bool:
         options.mode_drops_x10
         or options.alex_awakening
         or options.alex_rebalance
+        or options.alex_heros_mark
         or options.limit_break_cost_tenth
         or options.limit_break_cost_fixed
         or options.crystal_skill_90_off

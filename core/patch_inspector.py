@@ -274,6 +274,7 @@ from core.costume_packages import inspect_costume_packages
 from core.dex_smali import read_dex_strings
 from core.equipment_tier_upgrades import inspect_equipment_tiers
 from core.guild_raid_fire_support import inspect_guild_raid_fire_support
+from core.guild_raid_protection_persist import inspect_guild_raid_protection_persist
 from core.hero_shop_offers import inspect_hero_shop_offers
 from core.mythical_shop import inspect_mythical_shop
 from core.surprise_transcendence_package import inspect_surprise_transcendence_package
@@ -748,6 +749,28 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
                  "Native and client hooks verified" if active else "Hooks not fully patched")
     except Exception as exc:
         _feature(reports, "alex_awakening", "Alex Awakening: Destiny Lance", False, "Unknown", str(exc))
+
+    try:
+        from core.alex_heros_mark import inspect_alex_heros_mark_so
+
+        active, mark_detail = inspect_alex_heros_mark_so(so_bytes, seg_offset)
+        _feature(
+            reports,
+            "alex_heros_mark",
+            "Alex's Hero's Mark — The Unbroken Lance",
+            active,
+            "Active" if active else "Original / Partial",
+            mark_detail,
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "alex_heros_mark",
+            "Alex's Hero's Mark — The Unbroken Lance",
+            False,
+            "Unknown",
+            str(exc),
+        )
 
     try:
         active = inspect_costume_packages(so_bytes, seg_offset)
@@ -1601,6 +1624,27 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             reports,
             "guild_raid_fire_support",
             "Guild Raid Fire Support (100% HP + Odd Turns)",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
+    # 12p. Guild Raid Absolute Protection persistence Check
+    try:
+        active = inspect_guild_raid_protection_persist(so_bytes, seg_offset)
+        _feature(
+            reports,
+            "guild_raid_protection_persist",
+            "Guild Raid Absolute Protection Persists for All Hits",
+            active,
+            "Active (all hits until turn expiry)" if active else "Original",
+            "0xAB32F4 -> 0xB2AE18 runtime hook checked",
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "guild_raid_protection_persist",
+            "Guild Raid Absolute Protection Persists for All Hits",
             False,
             "Unknown",
             str(exc),
@@ -2867,6 +2911,7 @@ def _inspect_apk_resources(
 ) -> None:
     """Audits all datatable bundles inside ``assets/fwt_resources_v1.zip``."""
     from core.alex_awakening_assets import inspect_alex_awakening_assets
+    from core.alex_heros_mark import inspect_alex_heros_mark_assets
     from core.alex_rebalance import inspect_alex_rebalance_assets
     from core.apk_tooling import (
         inspect_crystal_skill_cost_assets,
@@ -3090,6 +3135,12 @@ def _inspect_apk_resources(
             "Alex Skill, Passive & Awake Rebalance",
             "Active (Skills 1-3, Passive & Awake Thornbush)",
             inspect_alex_rebalance_assets,
+        ),
+        (
+            "alex_heros_mark",
+            "Alex's Hero's Mark — The Unbroken Lance",
+            "Active (mark row, overlap boost, set effects, icon, cooltime)",
+            inspect_alex_heros_mark_assets,
         ),
     )
     if inner_zip is not None:
@@ -3320,6 +3371,8 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
         expected["alex_awakening"] = "Alex Awakening: Destiny Lance"
     if options.alex_rebalance:
         expected["alex_rebalance"] = "Alex Skill, Passive & Awake Rebalance"
+    if options.alex_heros_mark:
+        expected["alex_heros_mark"] = "Alex's Hero's Mark — The Unbroken Lance"
     if options.costume_packages_all:
         expected["costume_packages_all"] = "Complete Costume Packages"
     if options.recycle_six_star:
@@ -3380,6 +3433,10 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
     if options.guild_raid_fire_support:
         expected["guild_raid_fire_support"] = (
             "Guild Raid Fire Support (100% HP + Odd Turns)"
+        )
+    if options.guild_raid_protection_persist:
+        expected["guild_raid_protection_persist"] = (
+            "Guild Raid Absolute Protection Persists for All Hits"
         )
     if options.guild_raid_skills_max:
         expected["guild_raid_skills_max"] = "Guild Raid Skills Maxed (1M / 100%)"

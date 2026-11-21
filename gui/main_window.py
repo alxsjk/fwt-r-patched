@@ -625,6 +625,7 @@ class MainWindow(tk.Tk):
         self.var_surprise_transcendence_package = tk.BooleanVar(value=True)
         self.var_alex_awakening = tk.BooleanVar(value=True)
         self.var_alex_rebalance = tk.BooleanVar(value=True)
+        self.var_alex_heros_mark = tk.BooleanVar(value=True)
         self.var_costume_packages_all = tk.BooleanVar(value=True)
         self.var_recycle_six_star = tk.BooleanVar(value=True)
         self.var_campaign_shop_discount = tk.BooleanVar(value=True)
@@ -654,6 +655,7 @@ class MainWindow(tk.Tk):
         self.var_guild_raid_fire_support = tk.BooleanVar(value=True)
         self.var_guild_raid_skills_max = tk.BooleanVar(value=True)
         self.var_guild_raid_boss_no_counter = tk.BooleanVar(value=True)
+        self.var_guild_raid_protection_persist = tk.BooleanVar(value=False)
         self.var_single_black_hammer = tk.BooleanVar(value=True)
         self.var_equipment_tier_upgrades = tk.BooleanVar(value=True)
         self.var_single_gem_fang = tk.BooleanVar(value=True)
@@ -696,7 +698,8 @@ class MainWindow(tk.Tk):
             (self.var_hero_shop_offers, "Evan and Alex Shop Offers", "Unlimited Evan genes for 5 event coins and Alex genes for 1 medal; 100 Diamonds"),
             (self.var_surprise_transcendence_package, "Surprise Transcendence Package 2", "10 Ultimate and 10 Universal Transcendence Tickets for 500 diamonds"),
             (self.var_alex_awakening, "Alex Awakening: Destiny Lance", "Awaken Alex and unlock Destiny Lance, which damages and swaps places with a boss anywhere on the map"),
-            (self.var_alex_rebalance, "Alex Skill, Passive & Awake Rebalance", "Rebalances Alex Skills 1-3, Passive (Knighthood), and upgrades Destiny Lance to create permanent 1-cell Thornbush around the Boss's destination"),
+            (self.var_alex_rebalance, "Alex Skill, Passive & Awake Rebalance", "Skill 1 uses Skill 2's geometry (5-tile piercing); Skill 2 reduces Defense (not Attack) by 10-30%; Giga-break uses Jakyak's cast range; Passive and Destiny Lance keep their 2.5.53 behavior"),
+            (self.var_alex_heros_mark, "Alex's Hero's Mark — The Unbroken Lance", "Destiny Lance gains +25% damage per mark level (+250% at Lv10, first-turn castable); the team gains +20% damage and +10% Attack while >=1 ally is alive"),
             (self.var_costume_packages_all, "Complete Costume Packages", "Packages 3 and 4 each give one copy of every eligible owned costume; up to 10 purchases per package daily"),
             (self.var_recycle_six_star, "Recycling Grants 6★ Equipment", "Keeps the native equipment grant and turns all alchemy reward rows into a 6★ piece (grade 5 + secret grade 3, e.g. Absolute Gavel of Defense)"),
             (self.var_campaign_shop_discount, "90% Campaign Shop Discount", "90% discount across campaign shops (Honor, Ancient Coins, Guild Raid, Unknown Paradise, and Friend Shop)"),
@@ -737,6 +740,11 @@ class MainWindow(tk.Tk):
                 self.var_guild_raid_boss_no_counter,
                 "Guild Raid Boss 0% Counter Rate",
                 "Sets all Guild Raid boss counterattack rates to 0% instead of 300 (3%)",
+            ),
+            (
+                self.var_guild_raid_protection_persist,
+                "Guild Raid Absolute Protection Persists for All Hits",
+                "Keeps the Absolute Protection shield active for every hit on protected allies until its turn expiry, instead of only the first hit per ally",
             ),
             (self.var_single_black_hammer, "Single Black Hammer (+16..+26)", "Uses one black hammer per transcendence attempt instead of scaling 1, 2, 3..."),
             (self.var_equipment_tier_upgrades, "One Hammer per Equipment Tier", "One hammer advances equipment to +15, +20 or +26, depending on its current tier"),
@@ -1698,6 +1706,7 @@ class MainWindow(tk.Tk):
             surprise_transcendence_package=self.var_surprise_transcendence_package.get(),
             alex_awakening=self.var_alex_awakening.get(),
             alex_rebalance=self.var_alex_rebalance.get(),
+            alex_heros_mark=self.var_alex_heros_mark.get(),
             costume_packages_all=self.var_costume_packages_all.get(),
             recycle_six_star=self.var_recycle_six_star.get(),
             campaign_shop_discount=self.var_campaign_shop_discount.get(),
@@ -1729,6 +1738,7 @@ class MainWindow(tk.Tk):
             guild_raid_fire_support=self.var_guild_raid_fire_support.get(),
             guild_raid_skills_max=self.var_guild_raid_skills_max.get(),
             guild_raid_boss_no_counter=self.var_guild_raid_boss_no_counter.get(),
+            guild_raid_protection_persist=self.var_guild_raid_protection_persist.get(),
             single_black_hammer=self.var_single_black_hammer.get(),
             equipment_tier_upgrades=self.var_equipment_tier_upgrades.get(),
             single_gem_fang=self.var_single_gem_fang.get(),

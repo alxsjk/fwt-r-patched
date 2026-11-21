@@ -7,6 +7,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.5.54] - 2026-11-20
+
+### Added
+- **Guild Raid Absolute Protection persists for all hits (07.09, experimental)**: the shield now reduces every hit on protected allies until its native turn expiry instead of only the first hit per ally. The runtime client patch is fully implemented and statically tested, but is currently **blocked by the AppSealing anti-tamper watchdog** which kills the game process after detecting the modified code page. The feature is selectable via `--guild-raid-protection-persist` but not included in `--all`. Future development options are documented in `output/guild-skill-research-2026-11-20.md`.
+- **Alex's Hero's Mark — "The Unbroken Lance" (12.03, `--alex-heros-mark`)**: gives Alex a Hero's Mark in his Soul Gear tab with the Thanatos artwork. Destiny Lance gains +25% damage per mark level (cumulative, +250% at Lv10) and becomes first-turn castable at Lv10. The mark's set effects grant all allies +20% damage and +10% Attack while at least one ally is alive. The icon is added as a new archive member cloned from Thanatos's mark. The client installer hooks the covault exit-path branch at `0xAB3304`, so the mark ships in the same build as the Battle Arena team-save hook at `0xAB337C`.
+
+### Changed
+- **Alex Skill 1 (Piercing Lance, 12.02)**: cast range and area-of-effect pattern now match Skill 2 (Valiant Charge) — the 5-tile piercing pattern `(5, 13, 5, 19)` replaces the Phantom-derived `(3, 13, 3, 19)`.
+- **Alex Skill 2 (Valiant Charge, 12.02)**: the stat reduction changes from Attack to **Defense** — a new collision-free effect row `0x10018107` of the verified native type `DRDownRate` (132) replaces the retired `0x10018101` (`APDownRate` 59), preserving the -10%→-30% level profile across all 8 localized bundles.
+
 ## [2.5.53] - 2026-11-20
 
 ### Added

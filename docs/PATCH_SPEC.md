@@ -20,9 +20,9 @@ and are no longer selectable in the CLI or GUI.
 - Added/changed: `gold_cylinder_x10`, `mana_cylinder_x10`; the client hooks for
   `single_gem_fang` (RVA `0x1DCACEC`) and the campaign/event shop client tables;
   `no_win_box` is now an unconditional bug fix.
-- The release line is still `--all` plus the numeric factors; at `2.5.35`, `--all` covered 50 active features. As of `2.5.50`, `--all` enables **58** selectable features (plus default 16 KB alignment and the always-on `no_win_box` and `hero_exp_cap` fixes; see [FEATURE_CATALOG.md](FEATURE_CATALOG.md)).
+- The release line is still `--all` plus the numeric factors; at `2.5.35`, `--all` covered 50 active features. As of `2.5.54`, `--all` enables **59** selectable features (plus default 16 KB alignment and the always-on `no_win_box` and `hero_exp_cap` fixes; see [FEATURE_CATALOG.md](FEATURE_CATALOG.md)).
 
-## Original hero modifications (12.01–12.02)
+## Original hero modifications (12.01–12.03)
 
 Feature `12.01` (`--alex-awakening`, `PatchOptions.alex_awakening`) adds Alex's
 5★→6★ Awakening and Destiny Lance in 2.5.45. The implementation updates the
@@ -44,10 +44,10 @@ Skills 1–3 (`1048961`, `1048962`, `1048964`), Passive (*Knighthood*, `1048963`
 — when `alex_awakening` (`12.01`) is also active — Awakening (*Destiny Lance*, `0x100185`)
 via deterministic Unity asset-bundle patches in `core/alex_rebalance.py` across all 8
 locales:
-- Skill 1 uses Phantom Skill 1 geometry `(3, 13, 3, 19)` and adds Ian Skill 1 co-op
+- Skill 1 uses Skill 2 (Valiant Charge) geometry `(5, 13, 5, 19)` and adds Ian Skill 1 co-op
   damage (`23531665`).
-- Skill 2 uses Sehee Skill 2 geometry `(5, 13, 5, 19)`, replaces flat Atk reduction with
-  `-10%..-30%` percentage Atk reduction (`0x10018101`), and adds `+10%..+25%` co-op
+- Skill 2 keeps Sehee Skill 2 geometry `(5, 13, 5, 19)`, replaces flat Atk reduction with
+  `-10%..-30%` percentage **Defense** reduction (`0x10018107`, DRDownRate type 132), and adds `+10%..+25%` co-op
   Final Skill Power (`0x10018102`).
 - Skill 3 uses the cast range `(3, 13)` from Jakyak's *Do not Chase me*
   (`1056868`), retains Alex's AoE `(3, 8)`, and adds `+10%..+25%` co-op
@@ -65,6 +65,27 @@ locales:
 
 See [SKILL_REBALANCE_GUIDE.md](SKILL_REBALANCE_GUIDE.md) for the verified client/server
 architecture, float32 serialization rules, and future hero rebalancing workflow.
+
+Feature `12.03` (`--alex-heros-mark`, `PatchOptions.alex_heros_mark`) gives Alex
+the Hero's Mark *The Unbroken Lance* (`soulgearId 318865680`, `partsType 3`,
+`number 10`, choiceType 8, skill group `20490`, set group `30051`) in all 8
+locales, plus a set passives and a per-level Destiny Lance boost (`+25%` per
+mark level, cumulative, `+250%` at Lv10 with cooltime `0`). It rewrites 36
+resource tables and appends one archive member cloned from Thanatos's mark for
+the icon. The per-level list text is written literally per row (like stock
+group `4146`), and the Lv10 row adds the first-turn/cooldown line; the set
+group id must stay clear of stock ids (`30048` is Camilla's "Vampire" set, which
+the client showed as Alex's mark until the collision was fixed). Native side:
+`fwt_valid_soulgear_idx::kIds` accepts the new id at all five inlined call
+sites (`0x7EBDEC`, `0x7EC814`, `0x8B08A4`, `0x9A027C`, `0xA1B42C`) via 28-byte
+stubs at `0xB2AFDC`, and the post-Covault installer at `0xAB3304` patches the
+client `Skill::GetCurrentCoolTime` prologue (RVA `0x16064B4`, four words)
+through `PATCH_IL2CPP_HELPER` into the cave payload at `0xB2FAA0`. The
+installer deliberately does not use `0xAB337C`: that word belongs to
+`battle_arena_save_fix` (25b) and a combined build must keep both. `0xAB3304`
+is the `cbz w19` that splits the covault exit path, so every boot runs it; the
+cave returns to `0xAB3308` when `w19 != 0` and branches to `0xAB335C` when
+`w19 == 0`. Cave layout and site rationale: [CODE_CAVES.md](CODE_CAVES.md).
 
 ## 1. Target Architecture
 
@@ -259,6 +280,7 @@ Status legend:
 | 48 | `guild_raid_fire_support` | Guild Raid Fire Support (100% HP + Odd Turns) | SO + client + assets (`guildskilldata.unity3d`) | `guildskilldata` effect `1048578` -> `_value01=1.0, _value01Factor=0, _value02=0, _value02Factor=0`; runtime hook `0xAB335C` -> `0xB2ABC0` gates `0x018E7060` (`Player$$ExecuteReservedLordSkill`) to odd turns for `0x20000002` | Active (100% maxHp on minions; reserved auto-cast fires at odd-turn start; other skills unchanged) |
 | 49 | `guild_raid_skills_max` | Guild Raid Skills Maxed (1M / 100%) | assets (`guildskilldata.unity3d`, `guildskillinfo*.unity3d`) | Effects `1048577` (1M flat boss dmg), `1048579` (100% 1-hit DR), `1048580` (100% HP), `1048581` (100% MP), `1048582` (20 debuffs dispelled), all factors `0.0`; Absolute Protection (`536870915`) also links `effect03=1048581` (`target=1`) across all 8 `guildskillinfo*` bundles | Active (composes orthogonally with `guild_raid_fire_support`) |
 | 50 | `guild_raid_boss_no_counter` | Guild Raid Boss 0% Counter Rate | assets (`monsterdata.unity3d`) | All 70 Guild Raid boss rows (`400-01`..`400-07` host + spawn levels 1..9, `_boss == 100`): `_car = -1.0` -> `0.0` (overrides `CreatureData._baseCar = 0.03`) | Active (all Guild Raid bosses at 0% counter rate) |
+| 52 | `guild_raid_protection_persist` | Absolute Protection Persists for All Hits | SO (runtime client patch) | non-linked branch `0xAB3398` -> cave `0xB2AE18` calling `PATCH_IL2CPP_HELPER` for client RVA `0x1877C60` (`bl RemoveMultiTarget 0x1BAAEBC` -> `bl GetMultiTarget 0x1BAADB8`) | Active (07.09; all hits reduced until the native turn expiry) |
 | 51 | `hero_exp_cap` | Hero EXP Cap & Limit Break Floor | SO | `creature_level_max_value_json` floor `0x902008` -> `mov w20, #0x46 ; b 0x9020b8`; battle/expedition EXP hooks `0x80963C`, `0x81831C`, `0x945E30` -> cave `0xB2AD70` (`creature_max_total_exp_for_level_json`) | Always-on bug fix; prevents Lv71 EXP overflow and unlocks Limit Break for existing Lv71 un-transcended heroes |
 
 Build & infrastructure fields on `PatchOptions` (not gameplay patches): `server_ip` / `server_port` (target endpoint when `lan_redirect` is enabled, defaults `127.0.0.1:8010`), `align_16k` (Android 16 KB page alignment, default `True`, disabled with `--no-16k`), `allow_unknown` (bypass reference-APK guard via `--force`), and `dev` (`DevOptions`, documented in [`docs/DEV_BUILD.md`](DEV_BUILD.md)).
@@ -1232,6 +1254,37 @@ bootstrap's integrity contract must be updated in the same build:
   all three EXP grants to `level_max` (`0xA245DC`) while preserving `w8` on the
   expedition path.
 - Reference count: **4** sites (`1` floor + `3` hook branches) plus cave `0xB2AD70`. Always on; idempotent.
+
+#### 52. `guild_raid_protection_persist` — Absolute Protection Persists for All Hits
+
+- Every incoming hit on a protected ally runs `GameRule$$GetTargetReduceDamageRate`
+  → `GuildSkillManager$$UseDamageReduceEffect` (0.682 client RVA `0x1877BA8`),
+  whose consumption call `GuildSkillEffect$$RemoveMultiTarget` (`0x1BAAEBC`,
+  call site RVA `0x1877C60`) permanently removes the ally from the shield's
+  target list before returning the stored rate for that single hit.
+- The patch swaps that one call site to the ABI-identical non-destructive
+  `GuildSkillEffect$$GetMultiTarget` (`0x1BAADB8`): original word `0x940CCC97`,
+  replacement `0x940CCC56`. The shield therefore ends only via the native turn
+  expiry (`OnEndTurnCamp` → `IsFinishRemainTurnInflunce` →
+  `RemoveGuildSkillEffect`).
+- Delivery: the final `ret` of `patch_offline_convenience_flow` (`0xAB3398`,
+  original word `0xD65F03C0`) is replaced by a **non-linked** branch (a linked
+  `bl` would clobber the caller's return address restored in `x30`) into an
+  installer cave at `0xB2AE18..0xB2AE8C` (116 B, free tail of
+  `AbstractManglingParser::parseType`). The cave preserves `x0`/`x1`, reads the
+  cached `libil2cpp.so` base from `0xBE3798` (skipping safely when absent),
+  validates the client's original word through `PATCH_IL2CPP_HELPER`
+  (`0xAB575C`), rewrites the single word, and replays the displaced `ret`.
+- The immunity VFX/status removal after the first absorbed hit still runs
+  (cosmetic only). **Version note (corrected 2026-11-20)**: the 0.682
+  GuildSkillEffect cluster lives at `0x1BA9xxx` (as recorded in specs/009);
+  the decrypted dump `C:/tmp/fwt/handoff/libil2cpp.unido.so` is a **0.683.1**
+  image (layout `0x15B4xxx`) and must not be used for 0.682 addresses. The
+  shipped values were verified live against the running 0.682 process
+  (base `0x400022200000`, memory dump `output/il2cpp_live_0682.bin`).
+- Reference count: **2** (hook site + cave). Idempotent; composes with
+  07.06/07.07/07.08 (standalone: the stock level-scaled magnitude persists
+  for all hits).
 
 ---
 

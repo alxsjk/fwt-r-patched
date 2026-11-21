@@ -39,6 +39,7 @@ IAN_COOP_EFFECT_ID = 23531665
 
 # Donor IDs present across all 8 localized skilleffecttable*.unity3d bundles
 DONOR_ATK_RATE_DOWN_EFFECT = 23072800
+DONOR_DR_DOWN_RATE_EFFECT = 36835330  # DRDownRate (type 132), vt=2, precon 255, icon D_SkillIcon_33
 DONOR_COOP_UTILITY_EFFECT = 23531665
 DONOR_PASSIVE_FINAL_POWER_BUFF = 23662625
 DONOR_PASSIVE_ALL_DMG_REDUCE = 37818374
@@ -47,7 +48,8 @@ ALEX_AWAKE_DAMAGE_EFFECT_ID = 0x10018501
 DONOR_SWAP_EFFECT_ID = 21172225
 
 # Collision-free effect IDs for Alex rebalance (0x100181xx)
-NEW_ATK_RATE_DOWN_EFFECT_ID = 0x10018101
+# 0x10018101 (AtkDownRate) was retired in 2.5.54 — replaced by 0x10018107 (DRDownRate).
+NEW_DR_DOWN_RATE_EFFECT_ID = 0x10018107
 NEW_COOP_UTILITY_10_25_ID = 0x10018102
 NEW_PASSIVE_COOP_20_ID = 0x10018103
 NEW_PASSIVE_ALLY_DR_5_25_ID = 0x10018104
@@ -55,7 +57,7 @@ NEW_PASSIVE_DEBUFF_10_ID = 0x10018105
 NEW_AWAKE_THORNBUSH_ID = 0x10018106
 
 BASE_EFFECT_IDS = (
-    NEW_ATK_RATE_DOWN_EFFECT_ID,
+    NEW_DR_DOWN_RATE_EFFECT_ID,
     NEW_COOP_UTILITY_10_25_ID,
     NEW_PASSIVE_COOP_20_ID,
     NEW_PASSIVE_ALLY_DR_5_25_ID,
@@ -80,7 +82,7 @@ ENGLISH_TOOLTIPS: dict[int, str] = {
     ),
     ALEX_SKILL_2_ID: (
         "Attacks enemies within range and inflicts damage at [FF0000]{0}%[FFFFFF] of Attack. "
-        "Decreases the enemies' Attack by [FF0000]{3}%[FFFFFF] for {2} turn(s) with a [00D4FF]{1}%[FFFFFF] chance, "
+        "Decreases the enemies' Defense by [FF0000]{3}%[FFFFFF] for {2} turn(s) with a [00D4FF]{1}%[FFFFFF] chance, "
         "and inflicts [FF0000]{4}%[FFFFFF] damage over time. "
         "Cooperative attacks increase this skill's Final Power by [41FF3A]{5}%[FFFFFF]."
         "@4-3@0-0@0-1@1-3@2-3@3-3"
@@ -132,9 +134,10 @@ def expected_skill_updates(path: str, sid: int, current_tooltip: str) -> dict[st
     tooltip = _update_tooltip(path, sid, current_tooltip)
     if sid == ALEX_SKILL_1_ID:
         return {
-            "_range": 3,
+            # Cast range and AoE pattern now match Skill 2 (Sehee-derived (5, 13, 5, 19)).
+            "_range": 5,
             "_skillRangeType": 13,
-            "_skillEffectRange": 3,
+            "_skillEffectRange": 5,
             "_skillEffectRangeType": 19,
             "_effect01": ALEX_SKILL_1_MOVE_ATK_EFFECT,
             "_effect02": IAN_COOP_EFFECT_ID,
@@ -148,7 +151,7 @@ def expected_skill_updates(path: str, sid: int, current_tooltip: str) -> dict[st
             "_skillRangeType": 13,
             "_skillEffectRange": 5,
             "_skillEffectRangeType": 19,
-            "_effect01": NEW_ATK_RATE_DOWN_EFFECT_ID,
+            "_effect01": NEW_DR_DOWN_RATE_EFFECT_ID,
             "_effect02": ALEX_SKILL_2_DOT_EFFECT,
             "_effect03": NEW_COOP_UTILITY_10_25_ID,
             "_effect04": ALEX_SKILL_2_DAMAGE_EFFECT,
@@ -196,9 +199,9 @@ def build_rebalance_effect_rows(
     include_awake: bool,
 ) -> list[dict[str, Any]]:
     """Build the new collision-free skilleffecttable rows for Alex rebalance."""
-    atk_down = copy.deepcopy(by_id[DONOR_ATK_RATE_DOWN_EFFECT])
-    atk_down.update(
-        _skillEffectId=NEW_ATK_RATE_DOWN_EFFECT_ID,
+    dr_down = copy.deepcopy(by_id[DONOR_DR_DOWN_RATE_EFFECT])
+    dr_down.update(
+        _skillEffectId=NEW_DR_DOWN_RATE_EFFECT_ID,
         _effectValue=_f32(-0.10),
         _effectValueFactor=_f32(-0.20 / _STEPS_TO_MAX),
     )
@@ -246,7 +249,7 @@ def build_rebalance_effect_rows(
         _effectValueFactor=_f32(0.0),
     )
 
-    rows = [atk_down, coop_10_25, passive_coop_20, passive_ally_dr, passive_debuff_10]
+    rows = [dr_down, coop_10_25, passive_coop_20, passive_ally_dr, passive_debuff_10]
     if not include_awake:
         return rows
 
@@ -306,7 +309,7 @@ def _patch_effecttable_bundle(
     include_awake: bool,
 ) -> bytes | None:
     required_donors: tuple[int, ...] = (
-        DONOR_ATK_RATE_DOWN_EFFECT,
+        DONOR_DR_DOWN_RATE_EFFECT,
         DONOR_COOP_UTILITY_EFFECT,
         DONOR_PASSIVE_FINAL_POWER_BUFF,
         DONOR_PASSIVE_ALL_DMG_REDUCE,
