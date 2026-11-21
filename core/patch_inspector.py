@@ -2306,7 +2306,7 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
         active = not failed
         details = (
             "World Boss, Dimension (genes guaranteed x10), Nephthys, Lost Island, "
-            "Sky Library and Battle of Honor (60 coins, rank points x2)"
+            "Sky Library and Battle of Honor (60 coins, 100 rank points on win)"
             if active
             else "Unpatched or mismatched sub-checks: " + ", ".join(failed)
         )

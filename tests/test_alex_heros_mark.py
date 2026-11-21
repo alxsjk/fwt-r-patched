@@ -25,19 +25,25 @@ from core.alex_heros_mark import (
     ALEX_MARK_SERVER_CAVE_VADDR,
     ALEX_MARK_SET_GROUP_ID,
     ALEX_MARK_SKILL_GROUP_ID,
+    ALEX_SET_EFFECT01_ID,
     ALEX_SET_SKILL_ID,
     CLIENT_GET_COOLTIME_EXPECTED_WORDS,
     CLIENT_GET_COOLTIME_RVA,
+    DONOR_AP_UP_RATE,
+    DONOR_FINAL_POWER_BUFF,
     IL2CPP_BASE_CACHE,
     KIDS_HOOK_SITES,
     OVERLAP_LEVELS,
     PATCH_IL2CPP_HELPER,
+    _has_valid_mark_effects,
     apply_alex_heros_mark_so,
     build_alex_heros_mark_client_cave,
+    build_set_effect_rows,
     build_set_row,
     build_set_skill_row,
     overlap_description,
     patch_overlap_rows,
+    patch_set_effect_rows,
     patch_set_skilldata_rows,
     patch_setitemtable_rows,
 )
@@ -115,7 +121,7 @@ def test_cave_fits_and_keeps_its_landmarks() -> None:
     # Installer entry: no stack frame growth beyond its own push, and the
     # helper call plus both branch outcomes must be present.
     assert instructions[0].mnemonic == "stp"
-    assert "[sp, #-0x10]!" in instructions[0].op_str
+    assert "[sp, #-0x20]!" in instructions[0].op_str
     helper_calls = [
         i for i in instructions
         if i.mnemonic == "bl" and int(i.op_str[1:], 16) == PATCH_IL2CPP_HELPER
@@ -128,14 +134,11 @@ def test_cave_fits_and_keeps_its_landmarks() -> None:
     assert len(fire_support) == 1
     assert any(i.mnemonic == "cbnz" and "w19" in i.op_str for i in instructions)
 
-    # The literal trampoline the helper installs must point at the payload
-    # entry (the instruction right after the installer's final `ret`).
+    # The trampoline instruction pair is copied to the stack; its target is
+    # resolved at runtime so the library's load address is included.
     blob_offset = cave.find(struct.pack("<II", 0x58000050, 0xD61F0200))
     assert blob_offset >= 0
-    payload_va = struct.unpack("<Q", cave[blob_offset + 8:blob_offset + 16])[0]
-    payload = next(i for i in instructions if i.address == payload_va)
-    assert payload.mnemonic == "cbz"
-    assert payload.op_str.startswith("x0,")
+    assert any(i.mnemonic == "adr" and i.op_str.startswith("x9,") for i in instructions)
 
 
 def test_apply_alongside_battle_arena_save(
@@ -332,12 +335,129 @@ def test_unicorn_installer_preserves_flow_and_branches() -> None:
     assert uc.reg_read(UC_ARM64_REG_X19) == x19_value
 
 
+def test_installer_uses_relocated_payload_address() -> None:
+    pytest.importorskip("unicorn")
+    from unicorn import UC_ARCH_ARM64, UC_HOOK_CODE, UC_MODE_ARM, Uc
+    from unicorn.arm64_const import UC_ARM64_REG_SP, UC_ARM64_REG_W19, UC_ARM64_REG_X3
+
+    relocation = 0x40000000
+    stack = 0x8000000
+    branch, cave = build_alex_heros_mark_client_cave()
+    uc = Uc(UC_ARCH_ARM64, UC_MODE_ARM)
+    for address, size in ((0xAB3000, 0x10000), (0xB2F000, 0x2000), (0xBE3000, 0x2000)):
+        uc.mem_map(relocation + address, size)
+    uc.mem_map(stack, 0x10000)
+    uc.mem_write(relocation + ALEX_MARK_CLIENT_INSTALL_SITE, branch)
+    uc.mem_write(relocation + ALEX_MARK_CLIENT_CAVE_VADDR, cave)
+    uc.mem_write(relocation + IL2CPP_BASE_CACHE, struct.pack("<Q", 0x60000000))
+    uc.mem_write(relocation + PATCH_IL2CPP_HELPER, struct.pack("<I", 0xD65F03C0))
+    seen: list[int] = []
+
+    def observe(engine: Uc, address: int, _size: int, _user: object) -> None:
+        if address == relocation + PATCH_IL2CPP_HELPER:
+            data = bytes(engine.mem_read(engine.reg_read(UC_ARM64_REG_X3), 16))
+            assert struct.unpack("<II", data[:8]) == (0x58000050, 0xD61F0200)
+            seen.append(struct.unpack("<Q", data[8:])[0])
+
+    uc.hook_add(UC_HOOK_CODE, observe)
+    uc.reg_write(UC_ARM64_REG_SP, stack + 0x8000)
+    uc.reg_write(UC_ARM64_REG_W19, 1)
+    uc.emu_start(relocation + ALEX_MARK_CLIENT_INSTALL_SITE,
+                 relocation + ALEX_MARK_CLIENT_INSTALL_SITE + 4)
+    assert len(seen) == 1
+    assert relocation + ALEX_MARK_CLIENT_CAVE_VADDR <= seen[0] < (
+        relocation + ALEX_MARK_CLIENT_CAVE_VADDR + len(cave)
+    )
+
+
+@pytest.mark.parametrize(("level", "returns_zero"), [(9, False), (10, True)])
+def test_cooldown_hook_reads_character_data(level: int, returns_zero: bool) -> None:
+    """Exercise both cooldown paths with the character data at its verified offset."""
+    pytest.importorskip("unicorn")
+    from capstone import CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN, Cs
+    from unicorn import UC_ARCH_ARM64, UC_HOOK_CODE, UC_MODE_ARM, Uc
+    from unicorn.arm64_const import UC_ARM64_REG_LR, UC_ARM64_REG_SP, UC_ARM64_REG_X0
+
+    from core.alex_heros_mark import CLIENT_GET_COOLTIME_CONT_RVA, DESTINY_LANCE_SKILL_ID
+
+    _, cave = build_alex_heros_mark_client_cave()
+    insns = list(Cs(CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN).disasm(cave, ALEX_MARK_CLIENT_CAVE_VADDR))
+    payload_adr = next(i for i in insns if i.mnemonic == "adr" and i.op_str.startswith("x9,"))
+    payload = int(payload_adr.op_str.split("#")[-1], 16)
+    uc = Uc(UC_ARCH_ARM64, UC_MODE_ARM)
+    for addr, size in ((0xB2F000, 0x2000), (0xBE3000, 0x2000), (0x10000000, 0x10000),
+                       (0x40000000 + (CLIENT_GET_COOLTIME_CONT_RVA & ~0xFFF), 0x2000)):
+        uc.mem_map(addr, size)
+    uc.mem_write(ALEX_MARK_CLIENT_CAVE_VADDR, cave)
+    uc.mem_write(IL2CPP_BASE_CACHE, struct.pack("<Q", 0x40000000))
+    skill, skill_data, character, data, klass, mark = (
+        0x10000100, 0x10000200, 0x10000300, 0x10000400, 0x10001000, 0x10003000
+    )
+    getter, done = 0x10005000, 0x10006000
+    uc.mem_write(skill + 0x10, struct.pack("<QQ", character, skill_data))
+    uc.mem_write(skill_data + 0x10, struct.pack("<I", DESTINY_LANCE_SKILL_ID))
+    uc.mem_write(character + 0x20, struct.pack("<Q", data))
+    uc.mem_write(data, struct.pack("<Q", klass))
+    uc.mem_write(klass + 0xA40, struct.pack("<QQ", getter, 0))
+    uc.mem_write(mark + 0x30, struct.pack("<I", level))
+    uc.mem_write(getter, struct.pack("<I", 0xD65F03C0))
+    seen: list[int] = []
+
+    def hook(engine: Uc, address: int, _size: int, _user: object) -> None:
+        if address == getter:
+            seen.append(engine.reg_read(UC_ARM64_REG_X0))
+            engine.reg_write(UC_ARM64_REG_X0, mark)
+
+    uc.hook_add(UC_HOOK_CODE, hook)
+    uc.reg_write(UC_ARM64_REG_SP, 0x1000F000)
+    uc.reg_write(UC_ARM64_REG_LR, done)
+    uc.reg_write(UC_ARM64_REG_X0, skill)
+    stop = done if returns_zero else 0x40000000 + CLIENT_GET_COOLTIME_CONT_RVA
+    uc.emu_start(payload, stop)
+    assert seen == [data]
+    if returns_zero:
+        assert uc.reg_read(UC_ARM64_REG_X0) == 0
+    else:
+        assert uc.reg_read(UC_ARM64_REG_X0) == skill
+
+
 def test_set_row_is_built_with_a_free_group() -> None:
     row = build_set_row(ALEX_MARK_NAME)
     assert row["_setgroupid"] == ALEX_MARK_SET_GROUP_ID
     assert row["_setName"] == ALEX_MARK_NAME
     assert row["_setSkillid01"] == ALEX_SET_SKILL_ID
     assert row["_equipType"] == 3
+
+
+def test_mark_effect_inspection_rejects_changed_semantics() -> None:
+    rows = build_set_effect_rows({
+        DONOR_FINAL_POWER_BUFF: {"_skillEffectType": 68},
+        DONOR_AP_UP_RATE: {"_skillEffectType": 58},
+    })
+    assert _has_valid_mark_effects(rows)
+    rows[0]["_effectValue"] = 0.0
+    assert not _has_valid_mark_effects(rows)
+    rows[0]["_effectValue"] = 0.20
+    rows[1]["_precondition"] = 255
+    assert not _has_valid_mark_effects(rows)
+
+
+def test_final_skill_power_effect_and_idempotence() -> None:
+    rows = [
+        {"_skillEffectId": DONOR_FINAL_POWER_BUFF, "_skillEffectType": 68},
+        {"_skillEffectId": DONOR_AP_UP_RATE, "_skillEffectType": 58},
+    ]
+    assert patch_set_effect_rows(rows) == 2
+    effect = next(r for r in rows if r["_skillEffectId"] == ALEX_SET_EFFECT01_ID)
+    assert effect["_precondition"] == 255
+    assert effect["_preconValue"] == -1.0
+    assert effect["_effectTarget"] == 2
+    assert effect["_effectValue"] == pytest.approx(0.20)
+    assert _has_valid_mark_effects(rows)
+    assert patch_set_effect_rows(rows) == 0
+    effect["_precondition"] = 71
+    with pytest.raises(ValueError, match="differ"):
+        patch_set_effect_rows(rows)
 
 
 def test_set_row_refuses_to_hijack_a_stock_group() -> None:
@@ -356,8 +476,8 @@ def test_overlap_descriptions_scale_and_announce_the_lv10_cooldown() -> None:
     assert "25%" in texts[0]
     assert "50%" in texts[1]
     assert "250%" in texts[-1]
-    assert "cooldown -1 turn" in texts[-1]
-    assert all("cooldown" not in t for t in texts[:-1])
+    assert "Decreases Awakening Skill Cooldown by 1." in texts[-1]
+    assert all("Cooldown" not in t for t in texts[:-1])
 
 
 def test_set_skill_tooltip_matches_the_builder() -> None:
@@ -422,7 +542,7 @@ def test_stock_bundles_leave_mark_ids_free_and_rows_build(
         assert round(float(mine[0]["_effect01Extravalue"]), 4) == 0.25
         assert round(float(mine[-1]["_effect01Extravalue"]), 4) == 2.5
         assert mine[0]["_desEquip"] == overlap_description(1)
-        assert "cooldown -1 turn" in str(mine[-1]["_desEquip"])
+        assert "Decreases Awakening Skill Cooldown by 1." in str(mine[-1]["_desEquip"])
 
         skill_rows, _ = _read_datatable_rows(
             inner, "files/Resources/datatable/skilldataenglish.unity3d", label="skilldata"
@@ -435,3 +555,15 @@ def test_stock_bundles_leave_mark_ids_free_and_rows_build(
         assert skill["_tooltip"] == build_set_skill_row()["_tooltip"]
         assert "[41FF3A]" in str(skill["_tooltip"])
         assert patch_set_skilldata_rows(skill_rows) == 0
+
+        effect_rows, err = _read_datatable_rows(
+            inner, "files/Resources/datatable/skilleffecttableenglish.unity3d", label="effects"
+        )
+        assert effect_rows is not None, err
+        donor = next(r for r in effect_rows if r.get("_skillEffectId") == DONOR_FINAL_POWER_BUFF)
+        assert (donor["_skillEffectType"], donor["_effectTarget"], donor["_precondition"]) == (68, 2, 255)
+        team = next(r for r in skill_rows if r.get("_skillId") == 11608088)
+        assert team["_skillTarget"] == 2
+        assert patch_set_effect_rows(effect_rows) == 2
+        assert _has_valid_mark_effects(effect_rows)
+        assert patch_set_effect_rows(effect_rows) == 0

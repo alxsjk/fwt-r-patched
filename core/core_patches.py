@@ -439,7 +439,7 @@ HONOR_COIN_COUNT_ORIGINAL = bytes.fromhex("db008052")  # mov w27, #6
 HONOR_COIN_COUNT_REPLACEMENT = bytes.fromhex("9b078052")  # mov w27, #60
 
 # PvP rank points: pvp_score_delta returns the per-match score change.  A trampoline
-# at its return instruction doubles the delta for victories only.
+# at its return instruction sets the delta to 100 for victories only.
 HONOR_POINTS_DELTA_SITE = 0x95563C
 HONOR_POINTS_DELTA_ORIGINAL = bytes.fromhex("2001781e")  # fcvtzs w0, d9
 HONOR_POINTS_CAVE_VADDR = CAMPAIGN_CAVE_BASE + 0x524
@@ -450,7 +450,7 @@ HONOR_POINTS_CAVE_ORIGINAL_SHA256 = (
 HONOR_POINTS_CAVE_BYTES = bytes.fromhex(
     "2001781e"  # fcvtzs w0, d9           (original score delta)
     "7f020072"  # tst  w19, #1            (win flag)
-    "08781f53"  # lsl  w8, w0, #1
+    "880c8052"  # mov  w8, #100
     "0011801a"  # csel w0, w8, w0, ne
     "7e87f817"  # b    0x955640
 )
@@ -6461,7 +6461,7 @@ def apply_mode_drops_x10(buf: bytearray) -> int:
     3. Pit of Nephthys base gold (126 stages, prefixes 0x70, 0x71)
     4. Lost Island base gold (82 stages, prefixes 0x80, 0x81)
     5. Sky Library riddle table rewards (156 rows, col 5)
-    6. Battle of Honor coin grant (6 -> 60) and win rank points (x2)
+    6. Battle of Honor coin grant (6 -> 60) and win rank points (fixed 100)
 
     It also makes Dimension Breakthrough gene drops guaranteed and 10x larger.
     """
@@ -6483,7 +6483,7 @@ def apply_mode_drops_x10(buf: bytearray) -> int:
         _write_bytes(buf, honor_off, HONOR_COIN_COUNT_REPLACEMENT, "honor coin count")
         changed += 1
 
-    # Battle of Honor rank points: double the score delta on a victory.
+    # Battle of Honor rank points: fix the score delta to 100 on a victory.
     _write_recycle_cave(
         buf,
         HONOR_POINTS_CAVE_VADDR,

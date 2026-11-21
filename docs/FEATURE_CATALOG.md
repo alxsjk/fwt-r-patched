@@ -118,7 +118,7 @@ bonuses are still under investigation and are not yet guaranteed.
 
 ## 12 — Original hero modifications
 
-See the [Awakening guide](HERO_AWAKENING_GUIDE.md) and the [Skill rebalance guide](SKILL_REBALANCE_GUIDE.md) for details.
+See the [Awakening guide](HERO_AWAKENING_GUIDE.md), [Skill rebalance guide](SKILL_REBALANCE_GUIDE.md), and [Hero's Mark guide](HEROS_MARK_GUIDE.md) for details.
 
 | ID | Feature | CLI | PatchOptions field | GUI variable | `--all` |
 |---|---|---|---|---|---|

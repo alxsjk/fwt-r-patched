@@ -81,6 +81,13 @@ sites (`0x7EBDEC`, `0x7EC814`, `0x8B08A4`, `0x9A027C`, `0xA1B42C`) via 28-byte
 stubs at `0xB2AFDC`, and the post-Covault installer at `0xAB3304` patches the
 client `Skill::GetCurrentCoolTime` prologue (RVA `0x16064B4`, four words)
 through `PATCH_IL2CPP_HELPER` into the cave payload at `0xB2FAA0`. The
+installer resolves the payload address at runtime before building the
+trampoline, preserving relocation under ASLR. A level-10 device test confirmed
+first-turn availability and that battle starts without the previous crash;
+the level-10 equipment description now uses the stock cooldown-reduction
+wording. The set uses Lily's team-wide +20% Final Skill Power pattern
+(type 68, `_effectTarget=2`, `_precondition=255`) alongside the +10% Attack
+effect (`_effectTarget=2`, `_precondition=72`). The
 installer deliberately does not use `0xAB337C`: that word belongs to
 `battle_arena_save_fix` (25b) and a combined build must keep both. `0xAB3304`
 is the `cbz w19` that splits the covault exit path, so every boot runs it; the
@@ -636,9 +643,9 @@ bootstrap's integrity contract must be updated in the same build:
   2. **Battle of Honor**: the embedded result handler now grants and displays
      **60** Honor Coins per PvP win (`0x83FCF0`, `mov w27,#6` -> `#60`).
      The `honorreward.unity3d` preview asset is patched too.
-     - **Rank points x2**: the return of `pvp_score_delta` at `0x95563C`
-       branches to cave `0xB33838`, which doubles the score delta only when
-       the win flag is set (30-40 -> 60-80 points). Losses are unchanged.
+     - **Rank points fixed at 100**: the return of `pvp_score_delta` at `0x95563C`
+       branches to cave `0xB33838`, which sets the score delta to 100 when
+       the win flag is set. Losses are unchanged.
   3. **Dimension Breakthrough**: match-win gold/item roll multiplier trampoline
      cave at `0x94B528` -> `0xB33408`; the gene chance gate at `0x83C1E4` is
      bypassed and the rolled gene count at `0x83C25C` is multiplied by 10 via

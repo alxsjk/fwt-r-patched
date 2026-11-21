@@ -7,6 +7,21 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Battle of Honor rank points (01.06)**: set victory rank points to a fixed
+  100 instead of 2x (losses unchanged).
+
+### Fixed
+- **Alex's Hero's Mark (12.03)**: resolve the cooldown hook's trampoline
+  target at runtime instead of using an unrelocated address, and read the
+  character data container from its verified field. The level-10 cooldown
+  description uses the standard equipment wording. A device test confirmed
+  first-turn availability and battle startup. The set uses Lily's team-wide
+  +20% Final Skill Power pattern (`type 68`, `_effectTarget=2`,
+  `_precondition=255`) alongside the +10% Attack effect.
+- **Alex's Hero's Mark inspection**: validate the set effect types, targets,
+  conditions and values in the inspection report.
+
 ## [2.5.54] - 2026-11-20
 
 ### Added

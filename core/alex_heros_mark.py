@@ -7,7 +7,7 @@ Creates a Hero's Mark for Alex (creatureId 0x130181) in his Soul Gear tab:
   Destiny Lance gains +25% damage per mark level on ``_effect01`` (cumulative
   +250% at Lv10)
 - Set effects in ``setitemtable*.unity3d`` (8 locales): team-wide +20%
-  damage (type 68 FinalDamageUpByRateBuff) and +10% Attack while >=1 ally
+  Final Skill Power (type 68 FinalDamageUpByRateBuff) and +10% Attack while >=1 ally
   is alive (type 58 APUpRate, precon 72)
 - Server ``fwt_valid_soulgear_idx`` (``kIds``) cave in ``libfwt_local_server.so``
   so Alex's mark ID (``0x13018110``) passes make/grant/assign/parts validation
@@ -72,10 +72,7 @@ def overlap_description(level: int) -> str:
     percent = int(round(OVERLAP_BOOST_PER_LEVEL * level * 100))
     text = f"Increases Destiny Lance damage by [FF0000]{percent}%[FFFFFF]."
     if level == max(OVERLAP_LEVELS):
-        text += (
-            " Destiny Lance becomes usable on the first turn"
-            " (Awakening skill cooldown -1 turn)."
-        )
+        text += " Decreases Awakening Skill Cooldown by 1."
     return text
 
 # --- Set skill (passive with two effects) ---
@@ -84,7 +81,7 @@ ALEX_SET_SKILL_NAME = "The Unbroken Lance"
 ALEX_SET_EFFECT01_ID = 0x10018301  # collision-free skilleffecttable row
 ALEX_SET_EFFECT02_ID = 0x10018302  # collision-free skilleffecttable row
 
-# Effect 1: team-wide +20% damage (type 68, FinalDamageUpByRateBuff)
+# Effect 1: team-wide +20% Final Skill Power (type 68, FinalDamageUpByRateBuff)
 DONOR_FINAL_POWER_BUFF = 23667812  # Lily's effect01 donor (type 68)
 # Effect 2: +10% Attack with >=1 ally (type 58, APUpRate)
 DONOR_AP_UP_RATE = 22614017  # type 58 donor
@@ -100,6 +97,30 @@ def _is_close(a: Any, b: float, tol: float = 1e-6) -> bool:
         return math.isclose(float(a), b, rel_tol=0.0, abs_tol=tol)
     except (ValueError, TypeError):
         return False
+
+
+def _has_valid_mark_effects(rows: list[dict[str, Any]]) -> bool:
+    """Check the currently implemented set effects, including their semantics."""
+    expected = (
+        (ALEX_SET_EFFECT01_ID, 68, 2, 255, -1.0, 0.20),
+        (ALEX_SET_EFFECT02_ID, 58, 2, 72, 1.0, 0.10),
+    )
+    for effect_id, effect_type, target, condition, condition_value, value in expected:
+        matches = [r for r in rows if int(r.get("_skillEffectId", -1)) == effect_id]
+        if len(matches) != 1:
+            return False
+        row = matches[0]
+        if not (
+            int(row.get("_skillEffectType", -1)) == effect_type
+            and int(row.get("_effectTarget", -1)) == target
+            and int(row.get("_precondition", -1)) == condition
+            and _is_close(row.get("_preconValue"), condition_value)
+            and _is_close(row.get("_effectValue"), value)
+            and _is_close(row.get("_effectValueFactor"), 0.0)
+            and int(row.get("_effectValueType", -1)) == 2
+        ):
+            return False
+    return True
 
 
 def build_mark_row(locale_name: str) -> dict[str, Any]:
@@ -223,7 +244,7 @@ def build_set_effect_rows(by_id: dict[int, dict[str, Any]]) -> list[dict[str, An
         _skillEffectId=ALEX_SET_EFFECT01_ID,
         _effectTarget=2,  # all allies
         _precondition=255,
-        _preconValue=-1.0,
+        _preconValue=_f32(-1.0),
         _preconValue2=-1,
         _effectValue=_f32(0.20),
         _effectValueFactor=_f32(0.0),
@@ -309,6 +330,12 @@ def patch_overlap_rows(rows: list[dict[str, Any]]) -> int:
     """Add Alex's mark overlap group rows to the skilloverlaptable if absent."""
     existing = [r for r in rows if int(r.get("_groupId", -1)) == ALEX_MARK_SKILL_GROUP_ID]
     if existing:
+        expected = build_overlap_rows()
+        if len(existing) != len(expected) or any(
+            sum(all(r.get(k) == v for k, v in wanted.items()) for r in existing) != 1
+            for wanted in expected
+        ):
+            raise ValueError("Alex's mark overlap group differs from the expected rows")
         return 0
     rows.extend(build_overlap_rows())
     return len(OVERLAP_LEVELS)
@@ -323,6 +350,9 @@ def patch_set_skilldata_rows(rows: list[dict[str, Any]]) -> int:
 
     existing = [r for r in rows if int(r.get("_skillId", -1)) == ALEX_SET_SKILL_ID]
     if existing:
+        expected = build_set_skill_row()
+        if len(existing) != 1 or any(existing[0].get(k) != v for k, v in expected.items()):
+            raise ValueError("Alex's mark set skill differs from the expected row")
         return 0
     donor = next(
         (r for r in rows if int(r.get("_skillId", -1)) == DONOR_SET_SKILL_ID),
@@ -348,10 +378,18 @@ def patch_set_effect_rows(rows: list[dict[str, Any]]) -> int:
         if eid not in existing_ids:
             added += 1
     if added == 0:
+        if not _has_valid_mark_effects(rows):
+            raise ValueError("Alex's mark set effects differ from the expected rows")
         return 0
+    if added != 2:
+        raise ValueError("Alex's mark set effects are incomplete")
 
-    # Effect 1: team-wide +20% damage — find any type-68 (FinalDamageUpByRateBuff) row
+    # Effect 1: team-wide +20% Final Skill Power (prefer Lily's donor; fall back
+    # to any type-68 row for locales that omit newer heroes, or build from scratch)
     donor1 = next(
+        (r for r in rows if int(r.get("_skillEffectId", -1)) == DONOR_FINAL_POWER_BUFF),
+        None,
+    ) or next(
         (r for r in rows if int(r.get("_skillEffectType", -1)) == 68),
         None,
     )
@@ -366,9 +404,10 @@ def patch_set_effect_rows(rows: list[dict[str, Any]]) -> int:
             _effectValue=_f32(0.20),
             _effectValueFactor=_f32(0.0),
             _effectValueType=2,
+            _effectIcon="B_SkillIcon_68",
+            _effectString="Final Power Up",
         )
     else:
-        # Build from scratch with the full skilleffecttable schema
         final_power = {
             "_skillEffectId": ALEX_SET_EFFECT01_ID,
             "_effectName": "Final Skill Power % Increase - Buff",
@@ -391,6 +430,7 @@ def patch_set_effect_rows(rows: list[dict[str, Any]]) -> int:
             "_effectDuplicate": 1,
             "_effectOverlap": 1,
             "_skillIcon": "D_SkillIcon_33",
+            "_effectIcon": "B_SkillIcon_68",
             "_effectFxPrefab": "ETC_Buff_01",
             "_dispelAllow": 255,
             "_effectString": "Final Power Up",
@@ -564,9 +604,7 @@ def inspect_alex_heros_mark_assets(archive: zipfile.ZipFile) -> tuple[bool, str]
         rows, _err = _read_datatable_rows(archive, path, label=Path(path).name)
         if rows is None:
             continue
-        found01 = any(int(r.get("_skillEffectId", -1)) == ALEX_SET_EFFECT01_ID for r in rows)
-        found02 = any(int(r.get("_skillEffectId", -1)) == ALEX_SET_EFFECT02_ID for r in rows)
-        if found01 and found02:
+        if _has_valid_mark_effects(rows):
             et_ok += 1
     details.append(f"set effects: {et_ok}/8 locales")
     if et_ok != 8:
@@ -799,7 +837,7 @@ def build_alex_heros_mark_client_cave() -> tuple[bytes, bytes]:
     exp_words_asm = "\n".join(f"    .word {w:#010x}" for w in CLIENT_GET_COOLTIME_EXPECTED_WORDS)
     source = f"""
 installer_entry:
-    stp  x29, x30, [sp, #-0x10]!
+    stp  x29, x30, [sp, #-0x20]!
     adrp x9, {page:#x}
     ldr  x0, [x9, #{page_off:#x}]
     cbz  x0, installer_done
@@ -807,11 +845,16 @@ installer_entry:
     movk w1, #{rva_hi:#x}, lsl #16
     adr  x2, exp_words
     adr  x3, tramp_blob
+    ldr  x9, [x3]
+    str  x9, [sp, #0x10]
+    adr  x9, payload_entry
+    str  x9, [sp, #0x18]
+    add  x3, sp, #0x10
     mov  w4, #4
     adr  x5, hook_name
     bl   {PATCH_IL2CPP_HELPER:#x}
 installer_done:
-    ldp  x29, x30, [sp], #0x10
+    ldp  x29, x30, [sp], #0x20
     cbnz w19, installer_return
     b    {ALEX_MARK_CLIENT_INSTALL_W19_ZERO:#x}
 installer_return:
@@ -828,7 +871,7 @@ payload_entry:
     b.ne fallthrough
     ldr  x8, [x0, #0x10]
     cbz  x8, fallthrough
-    ldr  x8, [x8, #0x38]
+    ldr  x8, [x8, #0x20]
     cbz  x8, fallthrough
     stp  x0, x30, [sp, #-0x10]!
     mov  x0, x8
@@ -858,11 +901,10 @@ fallthrough:
     add  x16, x16, x17
     br   x16
 
-.p2align 3
+.p2align 2
 tramp_blob:
     .word 0x58000050
     .word 0xd61f0200
-    .quad payload_entry
 exp_words:
 {exp_words_asm}
 hook_name:
