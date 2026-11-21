@@ -91,6 +91,7 @@ def test_grouped_catalog_covers_options_flags_and_documentation() -> None:
     assert {field for field in fields if not field.startswith("dev.")} == patch_fields | {
         "no_win_box",
         "hero_exp_cap",
+        "convert_hex_guard",
     }
     assert {field.removeprefix("dev.") for field in fields if field.startswith("dev.")} == {
         field.name for field in dataclasses.fields(DevOptions)
@@ -106,7 +107,7 @@ def test_grouped_catalog_covers_options_flags_and_documentation() -> None:
         assert len(row.strip("|").split("|")) == 6
         assert feature.name in row
         assert feature.cli in row or feature.cli == "always on" and "Always on" in row
-        assert feature.field in row or feature.field in {"no_win_box", "hero_exp_cap"} and "Built-in fix" in row
+        assert feature.field in row or feature.field in {"no_win_box", "hero_exp_cap", "convert_hex_guard"} and "Built-in fix" in row
         variable = feature.variable or {"lan_redirect": "net_mode_var", "allow_unknown": "var_force"}.get(feature.field)
         assert (variable is None and "None" in row) or (variable is not None and f"`{variable}`" in row)
 
@@ -183,6 +184,7 @@ def test_gui_defaults_collect_valid_conflict_free_patch_options(
     assert options.battle_arena_save_fix is True
     assert options.guild_raid_mercenary is True
     assert options.guild_raid_fire_support is True
+    assert options.guild_raid_protection_persist is True
     assert options.guild_raid_skills_max is True
     assert options.guild_raid_boss_no_counter is True
     assert options.align_16k is True
@@ -246,6 +248,7 @@ def test_gui_option_vars_wire_all_features_and_preserve_exclusions(
         ("var_event_coin_x10", "event_coin_x10", True),
         ("var_guild_raid_score_fix", "guild_raid_score_fix", True),
         ("var_guild_raid_fire_support", "guild_raid_fire_support", True),
+        ("var_guild_raid_protection_persist", "guild_raid_protection_persist", True),
         ("var_guild_raid_skills_max", "guild_raid_skills_max", True),
         ("var_guild_raid_boss_no_counter", "guild_raid_boss_no_counter", True),
         ("var_single_black_hammer", "single_black_hammer", True),

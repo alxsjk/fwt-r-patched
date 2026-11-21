@@ -1,11 +1,14 @@
 """Client datatable rebalance for Alex (Feature 12.02: --alex-rebalance).
 
 Rebalances Alex's active skills 1-3 and passive (Knighthood) across all 8
-localized ``skilldata*.unity3d`` and ``skilleffecttable*.unity3d`` bundles
-inside ``assets/fwt_resources_v1.zip``. When combined with Feature 12.01
-(``--alex-awakening``), also updates Destiny Lance (``0x100185``) to trigger
-a permanent 1-cell Thornbush conversion centered on the Boss's destination
-cell (while keeping single-target boss swap geometry in the skill row).
+localized ``skilldata*.unity3d`` and ``skilleffecttable*.unity3d`` bundles, and
+adds Thornbush (``MovingType.Thornbush = 5``) as Alex's second terrain
+advantage (``_moveType1 = 5`` alongside ``_moveType0 = 1`` Field) across all 8
+``creaturedata*.unity3d`` bundles inside ``assets/fwt_resources_v1.zip``. When
+combined with Feature 12.01 (``--alex-awakening``), also updates Destiny Lance
+(``0x100185``) to trigger a permanent 1-cell Thornbush conversion centered on
+the Boss's destination cell (while keeping single-target boss swap geometry in
+the skill row).
 """
 
 from __future__ import annotations
@@ -104,6 +107,20 @@ ENGLISH_TOOLTIPS: dict[int, str] = {
 
 SKILLDATA_PATH_RE = re.compile(r"files/Resources/datatable/skilldata[a-z]*\.unity3d")
 EFFECTTABLE_PATH_RE = re.compile(r"files/Resources/datatable/skilleffecttable[a-z]*\.unity3d")
+CREATUREDATA_PATH_RE = re.compile(r"files/Resources/datatable/creaturedata[a-z]*\.unity3d")
+
+ALEX_CREATURE_IDS: tuple[int, ...] = (
+    1245569,
+    1245570,
+    1245571,
+    1245572,
+    1245573,
+    1245574,
+    3342725,
+)
+ALEX_MOVETYPE_FIELD = 1
+ALEX_MOVETYPE_THORNBUSH = 5
+ALEX_MOVETYPE_NONE = 255
 
 
 def _f32(value: float) -> float:
@@ -407,6 +424,42 @@ def _patch_skilldata_bundle(path: str, raw_bundle: bytes) -> bytes | None:
     return _save_and_verify_bundle(path, raw_bundle, mutate)
 
 
+def _patch_creaturedata_bundle(path: str, raw_bundle: bytes) -> bytes | None:
+    target_ids = set(ALEX_CREATURE_IDS)
+
+    def mutate(rows: list[dict[str, Any]]) -> tuple[bool, list[dict[str, Any]]]:
+        updated = copy.deepcopy(rows)
+        seen: set[int] = set()
+        changed = False
+        for row in updated:
+            cid = row.get("_creatureId")
+            if cid not in target_ids:
+                continue
+            if cid in seen:
+                raise ValueError(f"Duplicate creature {cid} in {path}")
+            seen.add(cid)
+            if (
+                row.get("_moveType0") == ALEX_MOVETYPE_FIELD
+                and row.get("_moveType1") == ALEX_MOVETYPE_THORNBUSH
+            ):
+                continue
+            if (
+                row.get("_moveType0") != ALEX_MOVETYPE_FIELD
+                or row.get("_moveType1") != ALEX_MOVETYPE_NONE
+            ):
+                raise ValueError(
+                    f"Unexpected moveTypes on Alex creature {cid} in {path}: "
+                    f"({row.get('_moveType0')}, {row.get('_moveType1')})"
+                )
+            row["_moveType1"] = ALEX_MOVETYPE_THORNBUSH
+            changed = True
+        if seen != target_ids:
+            raise ValueError(f"Missing Alex creatures in {path}: {sorted(target_ids - seen)}")
+        return changed, updated
+
+    return _save_and_verify_bundle(path, raw_bundle, mutate)
+
+
 def _read_rows(raw_bundle: bytes) -> list[dict[str, Any]]:
     import UnityPy
 
@@ -424,13 +477,16 @@ def prepare_alex_rebalance_assets(
     *,
     existing_replacements: dict[str, bytes] | None = None,
 ) -> dict[str, bytes]:
-    """Patch all 8 skilldata and 8 skilleffecttable bundles and verify round-trips."""
+    """Patch all 8 skilldata, 8 skilleffecttable, and 8 creaturedata bundles."""
     skill_paths = sorted(p for p in archive.namelist() if SKILLDATA_PATH_RE.fullmatch(p))
     effect_paths = sorted(p for p in archive.namelist() if EFFECTTABLE_PATH_RE.fullmatch(p))
+    creature_paths = sorted(p for p in archive.namelist() if CREATUREDATA_PATH_RE.fullmatch(p))
     if len(skill_paths) != 8:
         raise ValueError(f"Expected 8 localized skilldata tables, found {len(skill_paths)}")
     if len(effect_paths) != 8:
         raise ValueError(f"Expected 8 localized skilleffecttable tables, found {len(effect_paths)}")
+    if len(creature_paths) != 8:
+        raise ValueError(f"Expected 8 localized creaturedata tables, found {len(creature_paths)}")
 
     def read_bundle(path: str) -> bytes:
         if existing_replacements and path in existing_replacements:
@@ -450,11 +506,15 @@ def prepare_alex_rebalance_assets(
         patched = _patch_skilldata_bundle(path, read_bundle(path))
         if patched is not None:
             result[path] = patched
+    for path in creature_paths:
+        patched = _patch_creaturedata_bundle(path, read_bundle(path))
+        if patched is not None:
+            result[path] = patched
     return result
 
 
 def inspect_alex_rebalance_assets(archive: zipfile.ZipFile) -> tuple[bool, str]:
-    """Independently verify all 8 skilldata and 8 skilleffecttable bundles."""
+    """Independently verify all 8 skilldata, 8 skilleffecttable, and 8 creaturedata bundles."""
     try:
         import cryptography  # noqa: F401
         import UnityPy  # noqa: F401
@@ -463,8 +523,9 @@ def inspect_alex_rebalance_assets(archive: zipfile.ZipFile) -> tuple[bool, str]:
 
     skill_paths = sorted(p for p in archive.namelist() if SKILLDATA_PATH_RE.fullmatch(p))
     effect_paths = sorted(p for p in archive.namelist() if EFFECTTABLE_PATH_RE.fullmatch(p))
-    if len(skill_paths) != 8 or len(effect_paths) != 8:
-        return False, "Missing localized skilldata or skilleffecttable bundles"
+    creature_paths = sorted(p for p in archive.namelist() if CREATUREDATA_PATH_RE.fullmatch(p))
+    if len(skill_paths) != 8 or len(effect_paths) != 8 or len(creature_paths) != 8:
+        return False, "Missing localized skilldata, skilleffecttable, or creaturedata bundles"
 
     awake_present: bool | None = None
     for path in skill_paths:
@@ -506,6 +567,22 @@ def inspect_alex_rebalance_assets(archive: zipfile.ZipFile) -> tuple[bool, str]:
             if effect_by_id.get(eid) != exp_row:
                 return False, f"Effect {eid:#x} missing or mismatched in {path}"
 
+    for path in creature_paths:
+        rows = _read_rows(archive.read(path))
+        by_cid = {row.get("_creatureId"): row for row in rows if "_creatureId" in row}
+        for cid in ALEX_CREATURE_IDS:
+            row = by_cid.get(cid)
+            if row is None:
+                return False, f"Alex creature {cid} missing in {path}"
+            if (
+                row.get("_moveType0") != ALEX_MOVETYPE_FIELD
+                or row.get("_moveType1") != ALEX_MOVETYPE_THORNBUSH
+            ):
+                return False, f"Alex creature {cid} missing Thornbush terrain advantage in {path}"
+
     if include_awake:
-        return True, "Skills 1-3, Passive, and Destiny Lance 1-cell Thornbush verified across 16 tables"
-    return True, "Skills 1-3 and Passive verified across 16 tables"
+        return True, (
+            "Skills 1-3, Passive, Thornbush terrain advantage, and Destiny Lance "
+            "1-cell Thornbush verified across 24 tables"
+        )
+    return True, "Skills 1-3, Passive, and Thornbush terrain advantage verified across 24 tables"

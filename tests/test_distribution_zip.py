@@ -159,6 +159,11 @@ def test_stage_apk_only_rejects_unpatched_apk(
                 active=True,
                 status="Active (battle/expedition EXP clamped; Lv70 LB floor)",
             ),
+            "convert_hex_guard": FeatureReport(
+                name="Non-Hex Inventory Sync Guard (KB-001)",
+                active=True,
+                status="Patched (returns -1 on non-hex item_code)",
+            ),
         },
     )
     monkeypatch.setattr(create_distribution_zip, "inspect_apk", lambda _p: report)
@@ -196,6 +201,11 @@ def test_stage_apk_only_accepts_patched_apk_and_main_default(
                 name="Hero EXP Cap & Limit Break Floor",
                 active=True,
                 status="Active (battle/expedition EXP clamped; Lv70 LB floor)",
+            ),
+            "convert_hex_guard": FeatureReport(
+                name="Non-Hex Inventory Sync Guard (KB-001)",
+                active=True,
+                status="Patched (returns -1 on non-hex item_code)",
             ),
             "campaign_gold": FeatureReport(
                 name="10x Campaign Gold & Drops",

@@ -129,6 +129,13 @@ All 6 IDs were audited as unused across all 8 localized `skilleffecttable*.unity
 - **Passive (`1048963` — *Knighthood*):**
   - Replaces `26742786` (crit damage taken reduction) while keeping the debuff bonus (`+10%`) natively in `_effect01`.
   - Slots: `_effect01 = 0x10018105` (`+10%` vs. debuffed targets), `_effect02 = 0x10018103` (`+20%` in cooperative attacks), `_effect03 = 0x10018104` (`-5%~-25%` incoming damage while `>= 2` allies are alive), `_effect04 = -1`.
+- **Terrain Advantage (`creaturedata*.unity3d`):**
+  - Hero advantage tiles are stored as three byte fields (`_moveType0`, `_moveType1`, `_moveType2`) on each `CreatureData` row in `files/Resources/datatable/creaturedata*.unity3d` (8 localized bundles), using the `MovingType` enum:
+    `Land = 0`, `Plain/Field = 1`, `Water = 2`, `Swamp = 3`, `Glacier = 4`, `Thornbush = 5`, `Lava = 6`, `Poison = 7`, `Sky = 8`, `SuddenDeath = 9`, `DeepWater = 10`, `None = 255`.
+  - **Method used to add a second terrain advantage (`_moveType1`):**
+    1. Identify every `_creatureId` belonging to the hero across all star grades and variants (for Alex: `1245569..1245574` for 1★–6★ plus `3342725`).
+    2. Validate the baseline terrain slots (`_moveType0 == 1`, `_moveType1 == 255`) and assign `_moveType1 = 5` (`MovingType.Thornbush`), preserving `_moveType0` and all other fields.
+    3. Read from `existing_replacements` before `archive.read(path)` in `prepare_alex_rebalance_assets()` so earlier `creaturedata*.unity3d` edits from `alex_awakening` (`_skill4 = 0x100185` on `1245574`) are preserved, save with `packer="original"`, re-encrypt with `_encrypt_datatable`, and verify round-trip equality across all 8 localized `creaturedata*.unity3d` bundles (`24` total tables alongside the `8` `skilldata*` and `8` `skilleffecttable*` bundles).
 - **Awake (`0x100185` — *Destiny Lance*):**
   - Geometry: keeps global cast (`_range = 0, _skillRangeType = 2`) and single-target swap selection (`_skillEffectRange = 0, _skillEffectRangeType = 0`), with `_turnStart = 0, _turnEnd = 99` (100 turns, max standard byte duration in stock tables).
   - Slots: `_effect01 = 0x10018501` (unconditional 200% + 50%/lv Damage), `_effect02 = 21172225` (unconditional `PositionSwap`), `_effect03 = 0x10018106` (`TileChange` -> `MovingType.Thornbush = 5`), `_effect04 = -1`.
@@ -138,7 +145,7 @@ All 6 IDs were audited as unused across all 8 localized `skilleffecttable*.unity
 ### 4.3 Commands & Verification Gates
 
 ```bash
-# In-memory round-trip check across all 16 localized bundles
+# In-memory round-trip check across all 24 localized bundles
 .venv/bin/python -m tools.lab_alex_skill_rebalance --verify-only
 
 # Build dedicated DEV benchmark APK (run on a local SSD)
@@ -149,7 +156,7 @@ JAVA_HOME=/path/to/jdk21 .venv/bin/python -m tools.lab_alex_skill_rebalance
 ```
 
 ### 4.4 Device / Emulator Benchmark Checklist
-1. **Hero sheet (Lv 1 & Lv 10):** verify English tooltips and scaling (`10~30%` Atk down, `10~25%` co-op Final Power, `10%` vs debuffed, `20%` co-op, `2` living allies, `5~25%` incoming damage reduction).
+1. **Hero sheet (Lv 1 & Lv 10):** verify English tooltips, scaling (`10~30%` Atk down, `10~25%` co-op Final Power, `10%` vs debuffed, `20%` co-op, `2` living allies, `5~25%` incoming damage reduction), and both **Field** + **Thornbush** terrain advantage icons.
 2. **Skill 1 (`1048961`):** verify Phantom `(3, 13, 3, 19)` targeting grid + Ian co-op bonus *(validated in Trial 1)*.
 3. **Skill 2 (`1048962`):** verify Sehee `(5, 13, 5, 19)` grid, percentage Attack debuff (`D_SkillIcon_18`), and co-op damage increase.
 4. **Skill 3 (`1048964`):** compare the cast grid with Jakyak's *Do not Chase me* and confirm Alex's existing AoE, Stun, and co-op damage increase.

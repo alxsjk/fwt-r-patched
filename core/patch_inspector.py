@@ -20,6 +20,13 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from core.convert_hex_guard import (
+    CAVE_VADDR as CONVERT_HEX_GUARD_CAVE_VADDR,
+)
+from core.convert_hex_guard import (
+    LATE_HOOK_SITE as CONVERT_HEX_GUARD_HOOK_SITE,
+)
+from core.convert_hex_guard import inspect_convert_hex_guard
 from core.core_patches import (
     ARENA_DEFENCE_COUNT_REPLACEMENT,
     ARENA_DEFENCE_COUNT_SITE,
@@ -1156,6 +1163,27 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             str(exc),
         )
 
+    # 8a-septies-b. ConvertHexU32 non-hex guard (KB-001)
+    try:
+        active = inspect_convert_hex_guard(so_bytes, seg_offset)
+        _feature(
+            reports,
+            "convert_hex_guard",
+            "Non-Hex Inventory Sync Guard (KB-001)",
+            active,
+            "Patched (returns -1 on non-hex item_code)" if active else "Original",
+            f"hook 0x{CONVERT_HEX_GUARD_HOOK_SITE:x}, cave 0x{CONVERT_HEX_GUARD_CAVE_VADDR:x}",
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "convert_hex_guard",
+            "Non-Hex Inventory Sync Guard (KB-001)",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
     # 8a-octies. Soulgear enchant always succeeds
     try:
         enchant_offset = seg_offset(SOULGEAR_ENCHANT_SITE)
@@ -1614,16 +1642,16 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
         _feature(
             reports,
             "guild_raid_fire_support",
-            "Guild Raid Fire Support (100% HP + Odd Turns)",
+            "Guild Raid Fire Support (100% HP + Minion Auto-Cast)",
             active,
-            "Active (100% HP + odd-turn auto-cast hook)" if active else "Original",
+            "Active (100% HP + minion-aware auto-cast hook)" if active else "Original",
             "0xAB335C -> 0xB2ABC0 runtime hook checked",
         )
     except Exception as exc:
         _feature(
             reports,
             "guild_raid_fire_support",
-            "Guild Raid Fire Support (100% HP + Odd Turns)",
+            "Guild Raid Fire Support (100% HP + Minion Auto-Cast)",
             False,
             "Unknown",
             str(exc),
@@ -3107,8 +3135,8 @@ def _inspect_apk_resources(
     _reconcile_so_and_resource_report(
         features,
         key="guild_raid_fire_support",
-        name="Guild Raid Fire Support (100% HP + Odd Turns)",
-        active_status="Active (100% maxHp + odd-turn auto-cast)",
+        name="Guild Raid Fire Support (100% HP + Minion Auto-Cast)",
+        active_status="Active (100% maxHp + minion-aware auto-cast)",
         inner_zip=inner_zip,
         inspector=inspect_guild_raid_fire_support_assets,
         missing_archive_detail=(
@@ -3398,6 +3426,7 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
     # Bug fixes applied to every build, not options.
     expected["no_win_box"] = "Hide Phantom Win Boxes"
     expected["hero_exp_cap"] = "Hero EXP Cap & Limit Break Floor"
+    expected["convert_hex_guard"] = "Non-Hex Inventory Sync Guard (KB-001)"
     if options.rune_box_random_type:
         expected["rune_box_random_type"] = "4★ Rune Box Random Type"
     if options.rune_quality_factor:
@@ -3432,7 +3461,7 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
         expected["guild_raid_score_fix"] = "Guild Raid 64-bit Scores (>2.5B)"
     if options.guild_raid_fire_support:
         expected["guild_raid_fire_support"] = (
-            "Guild Raid Fire Support (100% HP + Odd Turns)"
+            "Guild Raid Fire Support (100% HP + Minion Auto-Cast)"
         )
     if options.guild_raid_protection_persist:
         expected["guild_raid_protection_persist"] = (
@@ -3532,7 +3561,7 @@ def verify_release_report(report: InspectionReport) -> list[str]:
         problems.append(f"Release requires 16 KB alignment: {report.alignment_details}")
     if report.is_valid_apk and not any(
         feature.active for key, feature in report.features.items()
-        if key not in {"no_win_box", "hero_exp_cap", "dev_build_marker"}
+        if key not in {"no_win_box", "hero_exp_cap", "convert_hex_guard", "dev_build_marker"}
     ):
         problems.append("APK appears unpatched (no active gameplay patches detected)")
     return problems

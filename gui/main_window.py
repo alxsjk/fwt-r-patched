@@ -655,7 +655,7 @@ class MainWindow(tk.Tk):
         self.var_guild_raid_fire_support = tk.BooleanVar(value=True)
         self.var_guild_raid_skills_max = tk.BooleanVar(value=True)
         self.var_guild_raid_boss_no_counter = tk.BooleanVar(value=True)
-        self.var_guild_raid_protection_persist = tk.BooleanVar(value=False)
+        self.var_guild_raid_protection_persist = tk.BooleanVar(value=True)
         self.var_single_black_hammer = tk.BooleanVar(value=True)
         self.var_equipment_tier_upgrades = tk.BooleanVar(value=True)
         self.var_single_gem_fang = tk.BooleanVar(value=True)
@@ -698,7 +698,7 @@ class MainWindow(tk.Tk):
             (self.var_hero_shop_offers, "Evan and Alex Shop Offers", "Unlimited Evan genes for 5 event coins and Alex genes for 1 medal; 100 Diamonds"),
             (self.var_surprise_transcendence_package, "Surprise Transcendence Package 2", "10 Ultimate and 10 Universal Transcendence Tickets for 500 diamonds"),
             (self.var_alex_awakening, "Alex Awakening: Destiny Lance", "Awaken Alex and unlock Destiny Lance, which damages and swaps places with a boss anywhere on the map"),
-            (self.var_alex_rebalance, "Alex Skill, Passive & Awake Rebalance", "Skill 1 uses Skill 2's geometry (5-tile piercing); Skill 2 reduces Defense (not Attack) by 10-30%; Giga-break uses Jakyak's cast range; Passive and Destiny Lance keep their 2.5.53 behavior"),
+            (self.var_alex_rebalance, "Alex Skill, Passive & Awake Rebalance", "Skill 1 uses Skill 2's geometry (5-tile piercing); Skill 2 reduces Defense (not Attack) by 10-30%; Giga-break uses Jakyak's cast range; adds Thornbush as Alex's second advantage terrain; Passive and Destiny Lance keep their 2.5.53 behavior"),
             (self.var_alex_heros_mark, "Alex's Hero's Mark — The Unbroken Lance", "Destiny Lance gains +25% damage per mark level (+250% at Lv10, first-turn castable); the team gains +20% Final Skill Power and +10% Attack while >=1 ally is alive"),
             (self.var_costume_packages_all, "Complete Costume Packages", "Packages 3 and 4 each give one copy of every eligible owned costume; up to 10 purchases per package daily"),
             (self.var_recycle_six_star, "Recycling Grants 6★ Equipment", "Keeps the native equipment grant and turns all alchemy reward rows into a 6★ piece (grade 5 + secret grade 3, e.g. Absolute Gavel of Defense)"),
@@ -728,8 +728,8 @@ class MainWindow(tk.Tk):
             (self.var_guild_raid_score_fix, "Guild Raid 64-bit Scores (>2.5B)", "Fixes the start-response overflow so Guild Raid records above 2.5B can load and settle"),
             (
                 self.var_guild_raid_fire_support,
-                "Guild Raid Fire Support (100% HP + Odd Turns)",
-                "Sets Fire Support minion damage to 100% maxHp and holds active/reserved auto-cast until the start of odd turns (1, 3, 5...); other skills keep normal timing",
+                "Guild Raid Fire Support (100% HP + Minion Auto-Cast)",
+                "Sets Fire Support minion damage to 100% maxHp and holds active/reserved auto-cast until minions spawn on the map; other skills keep normal timing",
             ),
             (
                 self.var_guild_raid_skills_max,

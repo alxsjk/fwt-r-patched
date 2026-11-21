@@ -56,6 +56,10 @@ locales:
   replacing incoming crit damage reduction (`26742786`) with `+20%` co-op damage
   (`0x10018103`) and `-5%..-25%` incoming hit damage reduction while `>= 2` allies are
   alive (`0x10018104`).
+- Terrain advantage: adds `MovingType.Thornbush = 5` as Alex's second advantage tile
+  (`_moveType1 = 5`, alongside `_moveType0 = 1` Field) across all 7 Alex creature rows
+  (`1245569..1245574`, `3342725`) in all 8 localized `creaturedata*.unity3d` bundles
+  (while preserving `_skill4` when `alex_awakening` is also active).
 - Awakening adds a permanent 1-cell Thornbush terrain conversion centered on the
   Boss's post-swap destination cell (`MovingType.Thornbush = 5`, `_turnStart = 0`,
   `_turnEnd = 99`), keeping single-target Boss selection/swap (`_skillEffectRange = 0`,
@@ -284,11 +288,12 @@ Status legend:
 | 45b | `limit_break_cost_fixed` | Flat Hero Limit Break Cost (1M gold + 100 Balance Jade) | SO + assets (`limitbreakcost.unity3d`) | `kFwtCreatureLimitBreakCosts` `0x756CF0`, all 45 rows: quantity `+16` = 100, gold `+20` = 1,000,000; client rows `_rewardValue02`/`_cost` set to the same pair | Active; shipped by `--all`; mutually exclusive with the 90% profile |
 | 46 | `soulgear_enchant_always` | Soulgear Enchant Always Succeeds | SO | `SoulgearGrowthStateAccess::apply`: verdict `cset w8, lo` at `0x8B3B4C` -> `mov w8, #1` | Active; gold-paid enchant always succeeds (soulgear upgrade has no roll) |
 | 47 | `no_win_box` | Hide Phantom Coocoo Boxes | SO | Battle advertisement off at `0x8DA77C`; Subjugation box gate at `0x8CFC7C` skips bonus boxes for mapped hero-gene stages | Always active |
-| 48 | `guild_raid_fire_support` | Guild Raid Fire Support (100% HP + Odd Turns) | SO + client + assets (`guildskilldata.unity3d`) | `guildskilldata` effect `1048578` -> `_value01=1.0, _value01Factor=0, _value02=0, _value02Factor=0`; runtime hook `0xAB335C` -> `0xB2ABC0` gates `0x018E7060` (`Player$$ExecuteReservedLordSkill`) to odd turns for `0x20000002` | Active (100% maxHp on minions; reserved auto-cast fires at odd-turn start; other skills unchanged) |
+| 48 | `guild_raid_fire_support` | Guild Raid Fire Support (100% HP + Minion Auto-Cast) | SO + client + assets (`guildskilldata.unity3d`) | `guildskilldata` effect `1048578` -> `_value01=1.0, _value01Factor=0, _value02=0, _value02Factor=0`; runtime hook `0xAB335C` -> `0xB2ABC0` gates `0x018E7060` (`Player$$ExecuteReservedLordSkill`) on `GetEnemyWithoutBossMultiTargets().Count > 0` for `0x20000002` | Active (100% maxHp on minions; reserved auto-cast holds until minions spawn on map; other skills unchanged) |
 | 49 | `guild_raid_skills_max` | Guild Raid Skills Maxed (1M / 100%) | assets (`guildskilldata.unity3d`, `guildskillinfo*.unity3d`) | Effects `1048577` (1M flat boss dmg), `1048579` (100% 1-hit DR), `1048580` (100% HP), `1048581` (100% MP), `1048582` (20 debuffs dispelled), all factors `0.0`; Absolute Protection (`536870915`) also links `effect03=1048581` (`target=1`) across all 8 `guildskillinfo*` bundles | Active (composes orthogonally with `guild_raid_fire_support`) |
 | 50 | `guild_raid_boss_no_counter` | Guild Raid Boss 0% Counter Rate | assets (`monsterdata.unity3d`) | All 70 Guild Raid boss rows (`400-01`..`400-07` host + spawn levels 1..9, `_boss == 100`): `_car = -1.0` -> `0.0` (overrides `CreatureData._baseCar = 0.03`) | Active (all Guild Raid bosses at 0% counter rate) |
-| 52 | `guild_raid_protection_persist` | Absolute Protection Persists for All Hits | SO (runtime client patch) | non-linked branch `0xAB3398` -> cave `0xB2AE18` calling `PATCH_IL2CPP_HELPER` for client RVA `0x1877C60` (`bl RemoveMultiTarget 0x1BAAEBC` -> `bl GetMultiTarget 0x1BAADB8`) | Active (07.09; all hits reduced until the native turn expiry) |
+| 52 | `guild_raid_protection_persist` | Absolute Protection Persists for All Hits | SO (runtime client patch) | mid-function hook `0xAB32F4` -> cave `0xB2AE18..0xB2AFC0` (424 B) patching client RVAs `0x1877C60` (`bl RemoveMultiTarget` -> `bl GetMultiTarget`), `0x1BAA2FC` (`b.lo -> nop`), and `0x1BAA318` (`b.ne -> nop`) via `PATCH_IL2CPP_HELPER` + `mprotect` fallback | Active (07.09; shipped in `--all`, protects all hits for full 1-turn duration) |
 | 51 | `hero_exp_cap` | Hero EXP Cap & Limit Break Floor | SO | `creature_level_max_value_json` floor `0x902008` -> `mov w20, #0x46 ; b 0x9020b8`; battle/expedition EXP hooks `0x80963C`, `0x81831C`, `0x945E30` -> cave `0xB2AD70` (`creature_max_total_exp_for_level_json`) | Always-on bug fix; prevents Lv71 EXP overflow and unlocks Limit Break for existing Lv71 un-transcended heroes |
+| 53 | `convert_hex_guard` | Non-Hex Inventory Sync Guard (KB-001) | SO (runtime client patch) | post-Covault installer `0xAB3370` -> cave `0xB2B098` patching `UtilFunc$$ConvertHexU32+0x94` (`0x0181178C`) to return `-1` on non-hex/`>8`-char `item_code` strings instead of throwing `FormatException` | Always-on bug fix (`08.07`); prevents `OnGetMyItemInfo` from aborting on corrupted template rows (`13000K`, `13000Y`) so later items (`2040031` Mythical Stones, `200002` Green Gems) load on restart |
 
 Build & infrastructure fields on `PatchOptions` (not gameplay patches): `server_ip` / `server_port` (target endpoint when `lan_redirect` is enabled, defaults `127.0.0.1:8010`), `align_16k` (Android 16 KB page alignment, default `True`, disabled with `--no-16k`), `allow_unknown` (bypass reference-APK guard via `--force`), and `dev` (`DevOptions`, documented in [`docs/DEV_BUILD.md`](DEV_BUILD.md)).
 
@@ -1269,29 +1274,31 @@ bootstrap's integrity contract must be updated in the same build:
   whose consumption call `GuildSkillEffect$$RemoveMultiTarget` (`0x1BAAEBC`,
   call site RVA `0x1877C60`) permanently removes the ally from the shield's
   target list before returning the stored rate for that single hit.
-- The patch swaps that one call site to the ABI-identical non-destructive
-  `GuildSkillEffect$$GetMultiTarget` (`0x1BAADB8`): original word `0x940CCC97`,
-  replacement `0x940CCC56`. The shield therefore ends only via the native turn
-  expiry (`OnEndTurnCamp` → `IsFinishRemainTurnInflunce` →
-  `RemoveGuildSkillEffect`).
-- Delivery: the final `ret` of `patch_offline_convenience_flow` (`0xAB3398`,
-  original word `0xD65F03C0`) is replaced by a **non-linked** branch (a linked
-  `bl` would clobber the caller's return address restored in `x30`) into an
-  installer cave at `0xB2AE18..0xB2AE8C` (116 B, free tail of
-  `AbstractManglingParser::parseType`). The cave preserves `x0`/`x1`, reads the
-  cached `libil2cpp.so` base from `0xBE3798` (skipping safely when absent),
-  validates the client's original word through `PATCH_IL2CPP_HELPER`
-  (`0xAB575C`), rewrites the single word, and replays the displaced `ret`.
-- The immunity VFX/status removal after the first absorbed hit still runs
-  (cosmetic only). **Version note (corrected 2026-11-20)**: the 0.682
-  GuildSkillEffect cluster lives at `0x1BA9xxx` (as recorded in specs/009);
-  the decrypted dump `C:/tmp/fwt/handoff/libil2cpp.unido.so` is a **0.683.1**
-  image (layout `0x15B4xxx`) and must not be used for 0.682 addresses. The
-  shipped values were verified live against the running 0.682 process
-  (base `0x400022200000`, memory dump `output/il2cpp_live_0682.bin`).
+- Additionally, `GuildSkillEffect$$OnEndTurnCamp` natively skipped effects
+  `1048577..1048582` (`0x1BAA2FC: b.lo #0x1baa334`) and restricted expiry to
+  `1048583` (`0x1BAA318: b.ne #0x1baa334`). Without clearing those two guards,
+  Absolute Protection (`1048579`) never expired at the end of the turn.
+- The runtime installer patches a 3-entry client table:
+  1. `0x1877C60`: `bl GuildSkillEffect::RemoveMultiTarget` (`0x940CCC97`) →
+     `bl GuildSkillEffect::GetMultiTarget` (`0x940CCC56`) so all hits are reduced.
+  2. `0x1BAA2FC`: `b.lo #0x1baa334` (`0x540001C3`) → `nop` (`0xD503201F`) to
+     include `1048579` in `OnEndTurnCamp` turn-end expiry.
+  3. `0x1BAA318`: `b.ne #0x1baa334` (`0x540000E1`) → `nop` (`0xD503201F`) so
+     `1048579` expires cleanly at the end of the 1-turn window.
+- Delivery: mid-function hook at `0xAB32F4` (`mov w8, #1`, original
+  `0x52800028` inside the common exit path of `patch_offline_convenience_flow`
+  after the `libil2cpp.so` base cache write at `0xAB0064`) calls the
+  424-byte self-healing installer cave at `0xB2AE18..0xB2AFC0` (free tail of
+  `AbstractManglingParser::parseType`). For each entry, the cave validates and
+  calls `PATCH_IL2CPP_HELPER` (`0xAB575C`), and if the helper declines while the
+  stock word is present, applies the write directly via `sysconf(_SC_PAGESIZE)`
+  (`0xB476C0`), `mprotect` RWX (`0xB476D0`), `0xB41794` icache flush, and
+  `mprotect` RX back before replaying `mov w8, #1` and returning to `0xAB32F8`.
+- Verified in Guild Raid on device (2.5.55): protects integrally for 1 turn across
+  all incoming hits and expires cleanly on turn end. Enabled in `--all`.
 - Reference count: **2** (hook site + cave). Idempotent; composes with
   07.06/07.07/07.08 (standalone: the stock level-scaled magnitude persists
-  for all hits).
+  for all hits for 1 turn).
 
 ---
 

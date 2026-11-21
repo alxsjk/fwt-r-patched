@@ -23,6 +23,9 @@ from core.alex_awakening_assets import (
 from core.alex_rebalance import (
     ALEX_AWAKE_DAMAGE_EFFECT_ID,
     ALEX_AWAKE_SKILL_ID,
+    ALEX_CREATURE_IDS,
+    ALEX_MOVETYPE_FIELD,
+    ALEX_MOVETYPE_THORNBUSH,
     ALEX_PASSIVE_ID,
     ALEX_SKILL_1_ID,
     ALEX_SKILL_2_ID,
@@ -30,6 +33,7 @@ from core.alex_rebalance import (
     AWAKE_EFFECT_IDS,
     AWAKE_THORNBUSH_TOOLTIP,
     BASE_EFFECT_IDS,
+    CREATUREDATA_PATH_RE,
     DONOR_COOP_UTILITY_EFFECT,
     DONOR_DR_DOWN_RATE_EFFECT,
     DONOR_PASSIVE_ALL_DMG_REDUCE,
@@ -174,17 +178,20 @@ def _build_patched_resource_zip(
     with zipfile.ZipFile(buf, "w") as out:
         for name, data in replacements.items():
             out.writestr(name, data)
-        # Keep any non-replaced skilldata/skilleffecttable paths if subsetted
+        # Keep any non-replaced skilldata/skilleffecttable/creaturedata paths if subsetted
         for name in source_resources.namelist():
             if name not in replacements and (
-                "skilldata" in name or "skilleffecttable" in name or name == REBIRTH_PATH
+                "skilldata" in name
+                or "skilleffecttable" in name
+                or "creaturedata" in name
+                or name == REBIRTH_PATH
             ):
                 out.writestr(name, source_resources.read(name))
     return buf.getvalue()
 
 
 @pytest.mark.integration
-def test_rebalance_standalone_all_16_tables_and_idempotent(reference_apk: Path) -> None:
+def test_rebalance_standalone_all_24_tables_and_idempotent(reference_apk: Path) -> None:
     with (
         zipfile.ZipFile(reference_apk) as outer,
         outer.open("assets/fwt_resources_v1.zip") as stream,
@@ -192,8 +199,14 @@ def test_rebalance_standalone_all_16_tables_and_idempotent(reference_apk: Path) 
     ):
         assert inspect_alex_rebalance_assets(resources)[0] is False
         replacements = prepare_alex_rebalance_assets(resources)
-        assert len(replacements) == 16
+        assert len(replacements) == 24
         for path, bundle in replacements.items():
+            if CREATUREDATA_PATH_RE.fullmatch(path):
+                creatures = {row.get("_creatureId"): row for row in _read_rows(bundle)}
+                for cid in ALEX_CREATURE_IDS:
+                    assert creatures[cid]["_moveType0"] == ALEX_MOVETYPE_FIELD, path
+                    assert creatures[cid]["_moveType1"] == ALEX_MOVETYPE_THORNBUSH, path
+                continue
             if not SKILLDATA_PATH_RE.fullmatch(path):
                 continue
             stock = {row.get("_skillId"): row for row in _read_rows(resources.read(path))}
@@ -213,7 +226,7 @@ def test_rebalance_standalone_all_16_tables_and_idempotent(reference_apk: Path) 
         with zipfile.ZipFile(io.BytesIO(patched_bytes)) as patched_zip:
             ok, msg = inspect_alex_rebalance_assets(patched_zip)
             assert ok is True, msg
-            assert "16 tables" in msg
+            assert "24 tables" in msg
             assert prepare_alex_rebalance_assets(patched_zip) == {}
 
 
@@ -232,7 +245,7 @@ def test_rebalance_combined_with_alex_awakening_thornbush_and_compat(reference_a
             resources,
             existing_replacements=awake_replacements,
         )
-        assert len(rebalance_replacements) == 16
+        assert len(rebalance_replacements) == 24
         merged = {**awake_replacements, **rebalance_replacements}
 
         patched_bytes = _build_patched_resource_zip(resources, merged)

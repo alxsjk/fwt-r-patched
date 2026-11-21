@@ -65,11 +65,12 @@ Every cave below is checked for non-overlap by `validate_cave_layout()` in
 | `0xB29EBC..0xB2A1BC` | 768 B | `itanium_demangle::AbstractManglingParser::parseType` | `dev_dispatch_log` (+ `0xB2A13C..0xB2A164` RW scratch) |
 | `0xB2A1BC..0xB2A35C` | 416 B | same (`0xB29EBC..0xB2B098`) | `dev_handler_timing`; `rune_upgrade_client` at `0xB2A360..0xB2A3AC`; `costume_packages_all` at `0xB2A3AC..0xB2A6B8`; `equipment_tier_upgrades` at `0xB2A700..0xB2A75C` and `0xB2A800..0xB2AB00` |
 | `0xB2AB00..0xB2ABC0` | 192 B | same | `wb_daily_kraken` (`mode_drops_x10`, fixed 500 Kraken Scales per Unknown Paradise attack) |
-| `0xB2ABC0..0xB2AD08` | 328 B | same | `guild_raid_fire_support` (07.06: post-Covault installer `0xAB335C` -> odd-turn gate at `0x018E7060`) |
+| `0xB2ABC0..0xB2ACFC` | 316 B | same | `guild_raid_fire_support` (07.06: post-Covault installer `0xAB335C` -> minion-presence gate at `0x018E7060`) |
 | `0xB2AD10..0xB2AD68` | 88 B | same | `single_gem_fang` (05.05: unlock holes 1..3 via `0x8ADE80` -> `update_equipment_hole_json`) |
 | `0xB2AD70..0xB2AE18` | 168 B | same | `hero_exp_cap` (08.06: EXP clamp helper + stage/Tower/expedition trampolines; `0xB2AE8C..0xB2B098` free tail) |
-| `0xB2AE18..0xB2AFDC` | 452 B | same | `guild_raid_protection_persist` (07.09: mid-function installer at `0xAB3348` calling `PATCH_IL2CPP_HELPER` for the UseDamageReduceEffect client swap, with diagnostic logging and a direct-write self-healing fallback) |
+| `0xB2AE18..0xB2AFC0` | 424 B | same | `guild_raid_protection_persist` (07.09: mid-function installer at `0xAB32F4` patching `UseDamageReduceEffect` `0x1877C60` and `GuildSkillEffect::OnEndTurnCamp` `0x1BAA2FC` / `0x1BAA318`, with diagnostic logging and self-healing `mprotect` fallback) |
 | `0xB2AFDC..0xB2B068` | 140 B | same (`0xB29EBC..0xB2B098`) | `alex_heros_mark` (12.03: five 28-byte `fwt_valid_soulgear_idx::kIds` loop-exit stubs served from the post-Covault installer at `0xAB3304`) |
+| `0xB2B098..0xB2B1B4` | 284 B | `itanium_demangle::AbstractManglingParser::parseName` (`0xB2B098..0xB2B750`) | `convert_hex_guard` (08.07 / KB-001: post-Covault installer `0xAB3370` -> `UtilFunc$$ConvertHexU32` `0x0181178C` non-hex guard) |
 | `0xB33314..0xB33624` | 784 B | `itanium_demangle::NewExpr::printLeft` (`0xB33314..0xB3384C`) | `campaign_gold` (gold/gene/mana), `recycle_completion_ticket` (+ tail), `event_coin`, `expedition_x10`, `dimension_x10`, `patch_flags`, `guild_raid_client`, `guild_raid_sentinel` |
 | `0xB33634..0xB33724` | 240 B | same (shared exclusive slot) | `battle_arena_save` (`0xB33634..0xB3367C`) + `single_gem_fang_client` (`0xB3367C..0xB336C8`) + `guild_raid_mercenary_client` (`0xB336D8..0xB33724`) |
 | `0xB33724..0xB3384C` | 296 B | same | `campaign_gold` (items at `0xB33734`), `dimension_gene_x10`, `recycle_reward_flag`, `gem_mining_x10`, `honor_points_x2`; `0xB337B4..0xB33800` is the One Modification Stone client cave (0x4C); `0xB33724..0xB33734` (16 B) and `0xB33800..0xB33820` (32 B) are free |
@@ -251,14 +252,15 @@ overlap.
 
 ### Guild Raid Fire Support (07.06)
 
-`guild_raid_fire_support` reserves `0xB2ABC0..0xB2AD08` (328 B) in the free
+`guild_raid_fire_support` reserves `0xB2ABC0..0xB2ACFC` (316 B) in the free
 `AbstractManglingParser::parseType` tail after `wb_daily_kraken`. Its
 installer hooks `0xAB335C` (`mov w0, #4` -> `bl 0xB2ABC0`, returning to
 `0xAB3360` with `w0 = 4` so the `0xAB3378..0xAB3394` chain stays untouched) and
 patches `Player$$ExecuteReservedLordSkill+0x2b4` (`0x018E7060`) at runtime so
-reserved Fire Support (`0x20000002`) with `lordGauge >= 15` holds on even UI turns
-(`(GameStage$$get_currentTurnNo() & 1) == 1`, 0-based `0 = Turn 1`) and fires
-automatically at the start of odd UI turns (`1, 3, 5...`).
+reserved Fire Support (`0x20000002`) with `lordGauge >= 15` checks
+`GuildSkillEffect$$GetEnemyWithoutBossMultiTargets()` (`0x01BAAFB4`): it holds
+when `Count == 0` (no live non-boss minions on the map) and fires automatically
+as soon as at least one minion spawns (`Count > 0`), regardless of turn number.
 
 ### Single Dragon Fang Opens All 3 Gem Slots (05.05)
 

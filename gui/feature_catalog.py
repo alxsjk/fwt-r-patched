@@ -101,7 +101,7 @@ FEATURE_GROUPS = (
             "guild_raid_fire_support",
             "var_guild_raid_fire_support",
             "--guild-raid-fire-support",
-            "Guild Raid Fire Support 100% HP and odd-turn auto-cast",
+            "Guild Raid Fire Support 100% HP and minion-aware auto-cast",
         ),
         Feature(
             "07.07",
@@ -122,7 +122,7 @@ FEATURE_GROUPS = (
             "guild_raid_protection_persist",
             "var_guild_raid_protection_persist",
             "--guild-raid-protection-persist",
-            "Guild Raid Absolute Protection persists for all hits (experimental — blocked by AppSealing anti-tamper)",
+            "Guild Raid Absolute Protection persists for all hits",
         ),
     )),
     FeatureGroup("08", "Language, network and build", (
@@ -132,6 +132,7 @@ FEATURE_GROUPS = (
         Feature("08.04", "lan_redirect", None, "--lan", "LAN server redirect"),
         Feature("08.05", "allow_unknown", None, "--force", "Allow non-reference APK"),
         Feature("08.06", "hero_exp_cap", None, "always on", "Hero EXP cap and Limit Break floor"),
+        Feature("08.07", "convert_hex_guard", None, "always on", "Non-hex inventory sync guard (KB-001)"),
     )),
     FeatureGroup("12", "Original hero modifications", (
         Feature("12.01", "alex_awakening", "var_alex_awakening", "--alex-awakening", "Alex Awakening: Destiny Lance"),

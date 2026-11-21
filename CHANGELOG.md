@@ -7,11 +7,26 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.5.55] - 2026-11-21
+
 ### Changed
 - **Battle of Honor rank points (01.06)**: set victory rank points to a fixed
   100 instead of 2x (losses unchanged).
+- **Guild Raid Fire Support auto-cast (07.06)**: replaced the 0-based odd-turn
+  gate in `Player$$ExecuteReservedLordSkill+0x2b4` (`0x018E7060`, cave
+  `0xB2ABC0..0xB2ACFC`) with live minion detection via
+  `GuildSkillEffect$$GetEnemyWithoutBossMultiTargets()` (`0x01BAAFB4`). Reserved
+  Fire Support (`0x20000002`) now holds whenever `Count == 0` and fires
+  immediately as soon as minions spawn on the map, regardless of turn parity.
+- **Alex terrain advantage (12.02, `--alex-rebalance`)**: added
+  `MovingType.Thornbush` (`5`) as Alex's second advantage terrain
+  (`_moveType1 = 5` alongside `_moveType0 = 1` Field) across all 7 Alex rows
+  (`1245569..1245574`, `3342725`) in all 8 localized `creaturedata*.unity3d`
+  bundles, matching the Thornbush tile created by *Destiny Lance*.
 
 ### Fixed
+- **Guild Raid Absolute Protection persists for all hits (07.09, `--guild-raid-protection-persist`)**: moved the post-Covault installer hook to the common exit block at `0xAB32F4` (`mov w8, #1` -> cave `0xB2AE18..0xB2AFC0`, 424 B) and patched a 3-entry client table via `PATCH_IL2CPP_HELPER` with a self-healing `sysconf`/`mprotect`/icache fallback: `0x1877C60` (`bl RemoveMultiTarget` -> `bl GetMultiTarget`) plus `GuildSkillEffect::OnEndTurnCamp` expiry guards at `0x1BAA2FC` and `0x1BAA318` (`nop`). Absolute Protection now protects integrally for 1 full turn across all incoming hits and expires cleanly at turn end. Now enabled in `--all` and verified in Guild Raid.
+- **[KB-001](docs/KNOWN_BUGS.md) — Mythical Stones & non-hex inventory sync (08.07, `convert_hex_guard`)**: added an always-on post-Covault client guard (`0xAB3370` -> `0xB2B098` -> `UtilFunc$$ConvertHexU32+0x94` at `0x0181178C`) that returns `-1` for non-hex or `>8`-character `item_code` strings instead of throwing `FormatException`. Prevents `OnGetMyItemInfo` from aborting on corrupted starter rows (`13000K`, `13000Y`) so later items (`2040031` Mythical Stones, `200002` Green Gems) load and display properly across game restarts.
 - **Alex's Hero's Mark (12.03)**: resolve the cooldown hook's trampoline
   target at runtime instead of using an unrelocated address, and read the
   character data container from its verified field. The level-10 cooldown

@@ -27,6 +27,13 @@ from core.alex_heros_mark import (
     ALEX_MARK_SERVER_CAVE_VADDR,
     apply_alex_heros_mark_so,
 )
+from core.convert_hex_guard import (
+    CAVE_SIZE as CONVERT_HEX_GUARD_CAVE_SIZE,
+)
+from core.convert_hex_guard import (
+    CAVE_VADDR as CONVERT_HEX_GUARD_CAVE_VADDR,
+)
+from core.convert_hex_guard import apply_convert_hex_guard
 from core.costume_packages import CAVES as COSTUME_PACKAGE_CAVES
 from core.costume_packages import apply_costume_packages
 from core.dex_smali import (
@@ -1877,6 +1884,7 @@ EXPECTED_PATCH_COUNTS = {
     "soulgear_enchant_always": 1,
     "no_win_box": 2,
     "hero_exp_cap": 4,
+    "convert_hex_guard": 2,
     "rune_option_quality": 1,
     "lan_redirect": 1,
 }
@@ -1902,6 +1910,7 @@ IDEMPOTENT_PATCHES: frozenset[str] = frozenset({
     "gold_cylinder_fix",
     "no_win_box",
     "hero_exp_cap",
+    "convert_hex_guard",
     "rune_option_quality",
     "expedition_bonus",
     "gene_priority",
@@ -2174,7 +2183,7 @@ class PatchOptions:
     battle_arena_fix: bool = False        # Battle Arena team configuration save and slot fix
     guild_raid_mercenary: bool = False    # Allow selecting own mercenary in Guild Raid
     guild_raid_reward_x10: bool = False   # 10x Guild Raid daily/weekly rank rewards
-    guild_raid_fire_support: bool = False  # Fire Support 100% HP + odd-turn auto-cast
+    guild_raid_fire_support: bool = False  # Fire Support 100% HP + minion-aware auto-cast
     guild_raid_skills_max: bool = False    # Max remaining 3 Guild Raid skills (1M/100%)
     guild_raid_boss_no_counter: bool = False  # Zero Guild Raid boss counter rate (0%)
     guild_raid_protection_persist: bool = False  # Absolute Protection DR covers all hits until expiry
@@ -3590,6 +3599,11 @@ def validate_cave_layout() -> None:
         "hero_exp_cap",
         HERO_EXP_CAP_CAVE_VADDR,
         HERO_EXP_CAP_CAVE_VADDR + HERO_EXP_CAP_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "convert_hex_guard",
+        CONVERT_HEX_GUARD_CAVE_VADDR,
+        CONVERT_HEX_GUARD_CAVE_VADDR + CONVERT_HEX_GUARD_CAVE_SIZE,
     ))
 
     # The 0xB33634 client-patcher slot is shared between two mutually-exclusive
@@ -7201,6 +7215,10 @@ def apply_all_patches(
     # level_max and ensure un-transcended 6★ heroes return level_max == 70 for
     # LimitBreakCost lookup.
     record("hero_exp_cap", apply_hero_exp_cap(so_buf))
+    # Bug fix, not an option: return -1 on non-hex item_code strings in
+    # UtilFunc$$ConvertHexU32 instead of throwing FormatException and aborting
+    # OnGetMyItemInfo before later items (e.g. Mythical Stones) are loaded.
+    record("convert_hex_guard", apply_convert_hex_guard(so_buf, seg_offset))
 
     if options.gold_cylinder_x10:
         record("gold_cylinder_x10", apply_gold_cylinder_x10(so_buf))

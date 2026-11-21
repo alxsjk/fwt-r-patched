@@ -1,4 +1,4 @@
-"""Keystone generator for the Guild Raid Fire Support odd-turn auto-cast cave."""
+"""Keystone generator for the Guild Raid Fire Support minion-aware auto-cast cave."""
 from __future__ import annotations
 
 import hashlib
@@ -17,7 +17,8 @@ IL2CPP_BASE_CACHE = 0xBE3798
 RVA_EXEC_RESERVED_HOOK = 0x018E7060
 EXPECTED_WORDS = (0x2A1403E1, 0xAA1F03E2, 0x97FE4128, 0x370015A0)
 RVA_GAME_STAGE_GET_INSTANCE = 0x01640248
-RVA_GAME_STAGE_GET_TURN_NO = 0x01641F38
+RVA_GAME_STAGE_GET_OPPONENT_CAMP = 0x01641FA4
+RVA_GET_ENEMY_WITHOUT_BOSS_TARGETS = 0x01BAAFB4
 RVA_GUILD_SKILL_MGR_ACTION = 0x01877508
 RVA_EXEC_RESERVED_TRUE = 0x018E7320
 RVA_EXEC_RESERVED_FALSE = 0x018E7334
@@ -34,21 +35,13 @@ def _imm32(reg: str, value: int) -> str:
     return "\n        ".join(lines)
 
 
-def _jump_rva(rva: int, *, link: bool) -> str:
-    page = IL2CPP_BASE_CACHE & ~0xFFF
-    off = IL2CPP_BASE_CACHE & 0xFFF
-    op = "blr" if link else "br"
-    return (
-        f"adrp x16, {page:#x}\n        "
-        f"ldr x16, [x16, #{off:#x}]\n        "
-        f"{_imm32('x17', rva)}\n        "
-        f"add x16, x16, x17\n        "
-        f"{op} x16"
-    )
+def _call_rva(rva: int, *, link: bool) -> str:
+    op = "bl" if link else "b"
+    return f"{_imm32('x17', rva)}\n        {op} call_rva"
 
 
 def generate() -> bytes:
-    """Assemble the 0xB2ABC0 installer + runtime odd-turn gate cave."""
+    """Assemble the 0xB2ABC0 installer + runtime minion-presence gate cave."""
     page = IL2CPP_BASE_CACHE & ~0xFFF
     off = IL2CPP_BASE_CACHE & 0xFFF
     src = f"""
@@ -90,14 +83,19 @@ def generate() -> bytes:
         str x0, [sp]
 
         mov x0, xzr
-        {_jump_rva(RVA_GAME_STAGE_GET_INSTANCE, link=True)}
+        {_call_rva(RVA_GAME_STAGE_GET_INSTANCE, link=True)}
         cbz x0, fail_open_stage
 
         mov x1, xzr
-        {_jump_rva(RVA_GAME_STAGE_GET_TURN_NO, link=True)}
-        // get_currentTurnNo() is 0-based (HUD displays turnNo + 1):
-        // bit 0 == 1 means even UI turns (2, 4, 6...) -> hold.
-        tbnz w0, #0, hold_even_turn
+        {_call_rva(RVA_GAME_STAGE_GET_OPPONENT_CAMP, link=True)}
+        cbz x0, fail_open_stage
+
+        mov x0, xzr
+        mov x1, xzr
+        {_call_rva(RVA_GET_ENEMY_WITHOUT_BOSS_TARGETS, link=True)}
+        cbz x0, hold_no_minions
+        ldr w8, [x0, #0x18]
+        cbz w8, hold_no_minions
 
     fail_open_stage:
         ldr x0, [sp]
@@ -106,19 +104,25 @@ def generate() -> bytes:
     do_action:
         mov w1, w20
         mov x2, xzr
-        {_jump_rva(RVA_GUILD_SKILL_MGR_ACTION, link=True)}
+        {_call_rva(RVA_GUILD_SKILL_MGR_ACTION, link=True)}
         tbz w0, #0, ret_false
-        {_jump_rva(RVA_EXEC_RESERVED_TRUE, link=False)}
+        {_call_rva(RVA_EXEC_RESERVED_TRUE, link=False)}
 
-    hold_even_turn:
+    hold_no_minions:
         add sp, sp, #0x10
     ret_false:
-        {_jump_rva(RVA_EXEC_RESERVED_FALSE, link=False)}
+        {_call_rva(RVA_EXEC_RESERVED_FALSE, link=False)}
+
+    call_rva:
+        adrp x16, {page:#x}
+        ldr x16, [x16, #{off:#x}]
+        add x16, x16, x17
+        br x16
 
     expected_words:
         .word {EXPECTED_WORDS[0]:#x}, {EXPECTED_WORDS[1]:#x}, {EXPECTED_WORDS[2]:#x}, {EXPECTED_WORDS[3]:#x}
     hook_name:
-        .asciz "fire_support_odd"
+        .asciz "fire_support_minion"
         .balign 4
     """
     raw, count = Ks(KS_ARCH_ARM64, KS_MODE_LITTLE_ENDIAN).asm(src, addr=CAVE)

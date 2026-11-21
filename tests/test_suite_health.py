@@ -89,6 +89,12 @@ def test_limit_break_profile_reconciliation_gates_verify_report() -> None:
             status="Active",
             details="always-on bug fix",
         ),
+        "convert_hex_guard": FeatureReport(
+            name="convert_hex_guard",
+            active=True,
+            status="Active",
+            details="always-on bug fix",
+        ),
     }
     _reconcile_limit_break_reports(
         features,

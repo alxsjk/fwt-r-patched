@@ -6,8 +6,9 @@ evidence gathered so far, and the recommended workaround until a fix ships.
 
 ## KB-001 — Mythical Stones do not reappear after restarting the game
 
-- **Status:** Open (pending resolution; no code fix ships in `2.5.53`)
-- **Affected versions:** `2.5.51` – `2.5.53`
+- **Status:** Resolved in `2.5.55` (fixed by `convert_hex_guard`, Feature `08.07`)
+- **Affected versions:** `2.5.51` – `2.5.54`
+- **Resolution:** `OnGetMyItemInfo` iterates `Result_GET_MY_ITEM_INFO.items` without an inner `try/catch` and calls `UtilFunc$$ConvertHexU32(item_code)`. Corrupted non-hex starter template rows (`13000K` at `item_idx 65` and `13000Y` at `item_idx 66`) caused `ConvertHexU32` to throw `FormatException`, aborting the loop before reaching later items such as `200002` (Green Gem) and `2040031` (Mythical Stone). Feature `08.07` (`convert_hex_guard`, `0xAB3370` -> `0xB2B098` -> `0x0181178C`) validates hex digits and length before calling `Convert.ToInt32(..., 16)`, returning `-1` cleanly on non-hex strings so all subsequent inventory items load on every restart.
 - **Feature:** [02.07 Mythical Stone in Event Shop](FEATURE_CATALOG.md)
   (`--mythical-stone-shop`, included in `--all`)
 - **Summary:** Mythical Stones (`item_code 2040031`) purchased from the

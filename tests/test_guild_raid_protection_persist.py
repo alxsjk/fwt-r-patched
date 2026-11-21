@@ -8,11 +8,16 @@ import pytest
 from core.core_patches import PatchOptions, apply_all_patches, validate_cave_layout
 from core.elf_mapping import read_load_segments, translate_vaddr
 from core.guild_raid_protection_persist import (
+    ARM64_NOP,
     CAVE_BYTES,
     CAVE_VADDR,
     CLIENT_EXPECTED_WORD,
     CLIENT_REPLACEMENT_WORD,
     CLIENT_RVA,
+    EXPIRY_ID_EXPECTED,
+    EXPIRY_ID_RVA,
+    EXPIRY_SKIP_EXPECTED,
+    EXPIRY_SKIP_RVA,
     GET_MULTI_TARGET_VADDR,
     LATE_HOOK_SITE,
     REMOVE_MULTI_TARGET_VADDR,
@@ -141,6 +146,13 @@ def test_unicorn_emulation_installer(
         UC_ARM64_REG_X3,
         UC_ARM64_REG_X4,
         UC_ARM64_REG_X5,
+        UC_ARM64_REG_X9,
+        UC_ARM64_REG_X10,
+        UC_ARM64_REG_X11,
+        UC_ARM64_REG_X12,
+        UC_ARM64_REG_X13,
+        UC_ARM64_REG_X14,
+        UC_ARM64_REG_X15,
         UC_ARM64_REG_X19,
         UC_ARM64_REG_X20,
     )
@@ -151,9 +163,6 @@ def test_unicorn_emulation_installer(
     apply_guild_raid_protection_persist(so_buf, offset)
 
     uc = Uc(UC_ARCH_ARM64, UC_MODE_ARM)
-    # Hook/cave/cache/PLT pages inside the server image, stack, and a fake
-    # il2cpp mapping for the client target site. The cave returns to the
-    # instruction after the hook (`LATE_HOOK_SITE + 4`), like the real flow.
     IL2CPP_BASE = 0x40000000
     STACK_TOP = 0x08008000
     RETURN_SITE = LATE_HOOK_SITE + 4
@@ -165,16 +174,24 @@ def test_unicorn_emulation_installer(
         (0x00BE3000, 0x2000),
         (0x08000000, 0x10000),
         (IL2CPP_BASE + (CLIENT_RVA & ~0xFFF), 0x4000),
+        (IL2CPP_BASE + (EXPIRY_SKIP_RVA & ~0xFFF), 0x4000),
     ):
         uc.mem_map(addr, size)
 
     uc.mem_write(LATE_HOOK_SITE, bytes(so_buf[offset(LATE_HOOK_SITE):offset(LATE_HOOK_SITE) + 4]))
     uc.mem_write(CAVE_VADDR, CAVE_BYTES)
     uc.mem_write(0x00BE3798, struct.pack("<Q", IL2CPP_BASE))
-    uc.mem_write(
-        IL2CPP_BASE + CLIENT_RVA,
-        struct.pack("<I", CLIENT_EXPECTED_WORD),
+    targets = (
+        (CLIENT_RVA, CLIENT_EXPECTED_WORD, CLIENT_REPLACEMENT_WORD),
+        (EXPIRY_SKIP_RVA, EXPIRY_SKIP_EXPECTED, ARM64_NOP),
+        (EXPIRY_ID_RVA, EXPIRY_ID_EXPECTED, ARM64_NOP),
     )
+
+    def reset_client_words() -> None:
+        for rva, expected_word, _ in targets:
+            uc.mem_write(IL2CPP_BASE + rva, struct.pack("<I", expected_word))
+
+    reset_client_words()
     ret_insn = struct.pack("<I", 0xD65F03C0)
     for stub in (0x00AB575C, 0x00B464B0, 0x00B476C0, 0x00B476D0, 0x00B41794):
         uc.mem_write(stub, ret_insn)
@@ -191,6 +208,19 @@ def test_unicorn_emulation_installer(
         UC_ARM64_REG_X19: 0xE5E5E5E5E5E5E5E5,
         UC_ARM64_REG_X20: 0xF6F6F6F6F6F6F6F6,
     }
+    expected_by_rva = {rva: (exp, rep) for rva, exp, rep in targets}
+
+    def clobber_scratch(engine: Uc) -> None:
+        for idx, reg in enumerate((
+            UC_ARM64_REG_X9,
+            UC_ARM64_REG_X10,
+            UC_ARM64_REG_X11,
+            UC_ARM64_REG_X12,
+            UC_ARM64_REG_X13,
+            UC_ARM64_REG_X14,
+            UC_ARM64_REG_X15,
+        )):
+            engine.reg_write(reg, 0xDEAD0000 + idx)
 
     def hook_code(engine: Uc, address: int, _size: int, _user: object) -> None:
         if address == 0x00AB575C:
@@ -201,15 +231,13 @@ def test_unicorn_emulation_installer(
             count = engine.reg_read(UC_ARM64_REG_W4)
             name_ptr = engine.reg_read(UC_ARM64_REG_X5)
             assert base == IL2CPP_BASE
-            assert rva == CLIENT_RVA
+            assert rva in expected_by_rva
+            exp_word, rep_word = expected_by_rva[rva]
             assert count == 1
-            assert struct.unpack("<I", bytes(engine.mem_read(expected_ptr, 4)))[0] == (
-                CLIENT_EXPECTED_WORD
-            )
-            assert struct.unpack("<I", bytes(engine.mem_read(patch_ptr, 4)))[0] == (
-                CLIENT_REPLACEMENT_WORD
-            )
+            assert struct.unpack("<I", bytes(engine.mem_read(expected_ptr, 4)))[0] == exp_word
+            assert struct.unpack("<I", bytes(engine.mem_read(patch_ptr, 4)))[0] == rep_word
             assert bytes(engine.mem_read(name_ptr, 18)) == b"ap_shield_persist\x00"
+            clobber_scratch(engine)
             if state["helper_mode"] == "write":
                 engine.mem_write(base + rva, bytes(engine.mem_read(patch_ptr, 4)))
                 engine.reg_write(UC_ARM64_REG_W0, 1)
@@ -218,14 +246,21 @@ def test_unicorn_emulation_installer(
                 engine.reg_write(UC_ARM64_REG_W0, 0)
                 events.append("helper_refused")
         elif address == 0x00B464B0:
+            clobber_scratch(engine)
             events.append("log")
         elif address == 0x00B476C0:
+            clobber_scratch(engine)
             engine.reg_write(UC_ARM64_REG_X0, 0x4000)
             events.append("sysconf")
         elif address == 0x00B476D0:
-            events.append(f"mprotect_w2_{engine.reg_read(UC_ARM64_REG_X2)}")
+            prot = engine.reg_read(UC_ARM64_REG_X2)
+            assert engine.reg_read(UC_ARM64_REG_X1) == 0x4000
+            assert (engine.reg_read(UC_ARM64_REG_X0) & 0x3FFF) == 0
+            clobber_scratch(engine)
+            events.append(f"mprotect_w2_{prot}")
             engine.reg_write(UC_ARM64_REG_W0, 0)
         elif address == 0x00B41794:
+            clobber_scratch(engine)
             events.append("cache_flush")
         elif address == RETURN_SITE:
             engine.emu_stop()
@@ -238,8 +273,8 @@ def test_unicorn_emulation_installer(
             uc.reg_write(reg, value)
         uc.emu_start(LATE_HOOK_SITE, RETURN_SITE)
 
-    def client_word() -> int:
-        raw = bytes(uc.mem_read(IL2CPP_BASE + CLIENT_RVA, 4))
+    def client_word(rva: int) -> int:
+        raw = bytes(uc.mem_read(IL2CPP_BASE + rva, 4))
         return int(struct.unpack("<I", raw)[0])
 
     def assert_preserved() -> None:
@@ -248,21 +283,19 @@ def test_unicorn_emulation_installer(
             assert uc.reg_read(reg) == value
         assert uc.reg_read(UC_ARM64_REG_W8) == 1
 
-    # 1. Helper cooperates: single helper call, diagnostic pre/post logs, no
-    # raw fallback needed, registers preserved.
+    # 1. Helper cooperates across all 3 sites, diagnostic pre/post logs, no fallback needed.
     events.clear()
     state["helper_mode"] = "write"
     run()
-    assert events == ["log", "helper_installed", "log"]
-    assert client_word() == CLIENT_REPLACEMENT_WORD
+    assert events == ["log", "helper_installed", "log"] * 3
+    for rva, _, rep in targets:
+        assert client_word(rva) == rep
     assert_preserved()
 
-    # 2. Helper refuses (the observed on-device behavior): the cave detects
-    # the unchanged stock word and applies the patch itself via
-    # sysconf + mprotect RWX + write + icache flush + mprotect RX.
+    # 2. Helper refuses: fallback applies all 3 patches via sysconf + mprotect RWX + flush + RX.
     events.clear()
     state["helper_mode"] = "refuse"
-    uc.mem_write(IL2CPP_BASE + CLIENT_RVA, struct.pack("<I", CLIENT_EXPECTED_WORD))
+    reset_client_words()
     run()
     assert events == [
         "log",
@@ -272,16 +305,17 @@ def test_unicorn_emulation_installer(
         "cache_flush",
         "mprotect_w2_5",
         "log",
-    ]
-    assert client_word() == CLIENT_REPLACEMENT_WORD
+    ] * 3
+    for rva, _, rep in targets:
+        assert client_word(rva) == rep
     assert_preserved()
 
-    # 3. Fail-safe: without a cached il2cpp base the cave logs the skip and
-    # still replays the displaced instruction and returns cleanly.
+    # 3. Fail-safe: without a cached il2cpp base the cave logs the skip and leaves words stock.
     events.clear()
     uc.mem_write(0x00BE3798, struct.pack("<Q", 0))
-    uc.mem_write(IL2CPP_BASE + CLIENT_RVA, struct.pack("<I", CLIENT_EXPECTED_WORD))
+    reset_client_words()
     run()
     assert events == ["log"]
-    assert client_word() == CLIENT_EXPECTED_WORD
+    for rva, exp, _ in targets:
+        assert client_word(rva) == exp
     assert_preserved()

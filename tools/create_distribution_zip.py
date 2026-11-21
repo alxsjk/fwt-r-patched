@@ -13,6 +13,7 @@ Can create:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import shutil
 import sys
 import zipfile
@@ -217,6 +218,11 @@ def stage_apk_only(output_path: Path) -> None:
 
 
 def main() -> None:
+    with contextlib.suppress(ImportError):
+        from dotenv import load_dotenv
+
+        load_dotenv(PROJECT_ROOT / ".env", override=False)
+
     parser = argparse.ArgumentParser(description="FWT Reborn Distribution Archive Generator")
     parser.add_argument(
         "--output",

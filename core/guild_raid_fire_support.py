@@ -6,10 +6,12 @@ Combines:
    deals exact 100% maxHP damage to targeted minions regardless of DR or turn count.
 2. Native post-Covault client hook at ``0xAB335C`` -> cave ``0xB2ABC0`` patching
    ``Player$$ExecuteReservedLordSkill+0x2b4`` (RVA ``0x018E7060``) at runtime: when Fire
-   Support (``0x20000002``) is active/reserved with full gauge (``lordGauge >= 15``) on an
-   even UI turn (0-based ``(GameStage$$get_currentTurnNo() & 1) == 1``, since HUD shows
-   ``currentTurnNo + 1``), hold the reservation without casting so it auto-fires at the
-   start of the next odd UI turn. All other Guild Raid skills retain normal immediate auto-fire.
+   Support (``0x20000002``) is active/reserved with full gauge (``lordGauge >= 15``),
+   check ``GuildSkillEffect$$GetEnemyWithoutBossMultiTargets().Count`` on the active
+   ``GameStage`` opponent camp. If no non-boss minions are alive on the map (``Count == 0``),
+   hold the reservation without casting; as soon as at least one minion spawns on any turn
+   (``Count > 0``), auto-fire immediately. All other Guild Raid skills retain normal
+   immediate auto-fire.
 """
 from __future__ import annotations
 
@@ -32,18 +34,17 @@ CAVE_VADDR = 0xB2ABC0
 CAVE_BYTES = bytes.fromhex(
     "ff0301d1fd7b03a9f35302a9c80500b013cd43f9330200b4090a80520900ab72"
     "e90300b909408052e9c3ba72e90700b9e9010010e90700f9e00313aa010c8e52"
-    "c131a07202070010e30300918400805225070010d22afe97f35342a9fd7b43a9"
-    "ff03019180008052c0035fd6500080521000a4729f02106ba1020054ff4300d1"
-    "e00300f9e0031faad00500b010ce43f9114980d2912ca0f21002118b00023fd6"
-    "200100b4e1031faad00500b010ce43f911e783d2912ca0f21002118b00023fd6"
-    "40020037e00340f9ff430091e103142ae2031faad00500b010ce43f911a18ed2"
-    "f130a0f21002118b00023fd600010036d00500b010ce43f911648ed2d131a0f2"
-    "1002118b00021fd6ff430091d00500b010ce43f991668ed2d131a0f21002118b"
-    "00021fd6e103142ae2031faa2841fe97a0150037666972655f737570706f7274"
-    "5f6f646400000000"
+    "c131a072a2060010e303009184008052c5060010d22afe97f35342a9fd7b43a9"
+    "ff03019180008052c0035fd6500080521000a4729f02106be1020054ff4300d1"
+    "e00300f9e0031faa114980d2912ca0f21e000094c00100b4e1031faa91f483d2"
+    "912ca0f219000094200100b4e0031faae1031faa91f695d25137a0f213000094"
+    "c00100b4081840b988010034e00340f9ff430091e103142ae2031faa11a18ed2"
+    "f130a0f209000094a000003611648ed2d131a0f205000014ff43009191668ed2"
+    "d131a0f201000014d00500b010ce43f91002118b00021fd6e103142ae2031faa"
+    "2841fe97a0150037666972655f737570706f72745f6d696e696f6e00"
 )
 CAVE_SIZE = len(CAVE_BYTES)
-CAVE_ORIGINAL_SHA256 = "28088fb932446b8d2bc49b41142ec541f8bd93a292947f4af9c62a4baded91ee"
+CAVE_ORIGINAL_SHA256 = "1fd925d5f1d9e94b2c24cd39da0fefc04454ca162d478933e8cbe0bfdd3c734f"
 
 LATE_HOOK_SITE = 0xAB335C
 LATE_HOOK_ORIGINAL = bytes.fromhex("80008052")  # mov w0, #4

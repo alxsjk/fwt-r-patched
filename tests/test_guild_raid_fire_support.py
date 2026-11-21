@@ -1,4 +1,4 @@
-"""Tests for Feature 07.06: Guild Raid Fire Support 100% HP + odd-turn auto-cast."""
+"""Tests for Feature 07.06: Guild Raid Fire Support 100% HP + minion-aware auto-cast."""
 from __future__ import annotations
 
 import struct
@@ -133,15 +133,18 @@ def test_unicorn_emulation_installer_and_turn_gating(
     STACK_TOP = 0x08008000
     STOP_ADDR = 0x09000000
 
+    LIST_OBJ = 0x13570000
     for addr, size in (
         (0x00AB3000, 0x10000),
         (0x00B2A000, 0x4000),
         (0x00BE3000, 0x2000),
         (0x08000000, 0x10000),
         (STOP_ADDR, 0x1000),
+        (LIST_OBJ, 0x1000),
         (IL2CPP_BASE + 0x01640000, 0x4000),
         (IL2CPP_BASE + 0x01877000, 0x4000),
         (IL2CPP_BASE + 0x018E7000, 0x4000),
+        (IL2CPP_BASE + 0x01BAA000, 0x4000),
     ):
         uc.mem_map(addr, size)
 
@@ -153,13 +156,20 @@ def test_unicorn_emulation_installer_and_turn_gating(
     expected_words = (0x2A1403E1, 0xAA1F03E2, 0x97FE4128, 0x370015A0)
     uc.mem_write(IL2CPP_BASE + 0x018E7060, b"".join(struct.pack("<I", w) for w in expected_words))
     ret_insn = struct.pack("<I", 0xD65F03C0)
-    for rva in (0x01640248, 0x01641F38, 0x01877508, 0x018E7320, 0x018E7334):
+    for rva in (0x01640248, 0x01641FA4, 0x01BAAFB4, 0x01877508, 0x018E7320, 0x018E7334):
         uc.mem_write(IL2CPP_BASE + rva, ret_insn)
     uc.mem_write(0x00AB575C, ret_insn)
     uc.mem_write(0x00AB3360, struct.pack("<I", 0xD503201F))  # nop at return site
 
     events: list[tuple[str, int]] = []
-    state = {"stage_ptr": 0x12340000, "turn_no": 2, "action_ret": 1, "action_calls": 0}
+    state = {
+        "stage_ptr": 0x12340000,
+        "camp_ptr": 0x23450000,
+        "list_ptr": LIST_OBJ,
+        "minion_count": 0,
+        "action_ret": 1,
+        "action_calls": 0,
+    }
 
     def hook_code(engine: Uc, address: int, _size: int, _user: object) -> None:
         if address == 0x00AB575C:
@@ -173,16 +183,21 @@ def test_unicorn_emulation_installer_and_turn_gating(
             assert rva == 0x018E7060
             assert count == 4
             assert engine.mem_read(exp_ptr, 16) == engine.mem_read(base + rva, 16)
-            assert bytes(engine.mem_read(name_ptr, 16)) == b"fire_support_odd"
+            assert bytes(engine.mem_read(name_ptr, 19)) == b"fire_support_minion"
             engine.mem_write(base + rva, bytes(engine.mem_read(patch_ptr, 16)))
             engine.reg_write(UC_ARM64_REG_W0, 1)
             events.append(("helper_installed", rva))
         elif address == IL2CPP_BASE + 0x01640248:
             events.append(("get_instance", 0))
             engine.reg_write(UC_ARM64_REG_X0, state["stage_ptr"])
-        elif address == IL2CPP_BASE + 0x01641F38:
-            events.append(("get_turn", engine.reg_read(UC_ARM64_REG_X0)))
-            engine.reg_write(UC_ARM64_REG_W0, state["turn_no"])
+        elif address == IL2CPP_BASE + 0x01641FA4:
+            events.append(("get_opponent_camp", engine.reg_read(UC_ARM64_REG_X0)))
+            engine.reg_write(UC_ARM64_REG_X0, state["camp_ptr"])
+        elif address == IL2CPP_BASE + 0x01BAAFB4:
+            events.append(("get_minions", 0))
+            if state["list_ptr"]:
+                engine.mem_write(state["list_ptr"] + 0x18, struct.pack("<I", state["minion_count"]))
+            engine.reg_write(UC_ARM64_REG_X0, state["list_ptr"])
         elif address == IL2CPP_BASE + 0x01877508:
             state["action_calls"] += 1
             events.append(("action", engine.reg_read(UC_ARM64_REG_W1)))
@@ -206,9 +221,23 @@ def test_unicorn_emulation_installer_and_turn_gating(
     assert uc.reg_read(UC_ARM64_REG_W0) == 4
     assert uc.reg_read(UC_ARM64_REG_SP) == STACK_TOP
 
-    def run_hook(skill_id: int, turn_no: int, *, stage_ptr: int = 0x12340000, action_ret: int = 1) -> list[tuple[str, int]]:
+    def run_hook(
+        skill_id: int,
+        minion_count: int,
+        *,
+        stage_ptr: int = 0x12340000,
+        camp_ptr: int = 0x23450000,
+        list_ptr: int = LIST_OBJ,
+        action_ret: int = 1,
+    ) -> list[tuple[str, int]]:
         events.clear()
-        state.update({"stage_ptr": stage_ptr, "turn_no": turn_no, "action_ret": action_ret})
+        state.update({
+            "stage_ptr": stage_ptr,
+            "camp_ptr": camp_ptr,
+            "list_ptr": list_ptr,
+            "minion_count": minion_count,
+            "action_ret": action_ret,
+        })
         uc.reg_write(UC_ARM64_REG_SP, STACK_TOP)
         uc.reg_write(UC_ARM64_REG_X0, 0x55550000)
         uc.reg_write(UC_ARM64_REG_W20, skill_id)
@@ -217,33 +246,48 @@ def test_unicorn_emulation_installer_and_turn_gating(
         assert uc.reg_read(UC_ARM64_REG_SP) == STACK_TOP
         return list(events)
 
-    # 0-based turn_no: 1 == HUD Turn 2 (even), 2 == HUD Turn 3 (odd), 0 == HUD Turn 1 (odd).
-    # Even UI turn (HUD Turn 2 -> turn_no=1) + Fire Support (0x20000002): holds without Action.
-    assert run_hook(0x20000002, 1) == [("get_instance", 0), ("get_turn", 0x12340000), ("exit_false", 0)]
-    assert state["action_calls"] == 0
-
-    # Even UI turn (HUD Turn 4 -> turn_no=3) + Fire Support (0x20000002): also holds.
-    assert run_hook(0x20000002, 3) == [("get_instance", 0), ("get_turn", 0x12340000), ("exit_false", 0)]
-    assert state["action_calls"] == 0
-
-    # Odd UI turn (HUD Turn 3 -> turn_no=2) + Fire Support (0x20000002): calls Action and exits true.
-    assert run_hook(0x20000002, 2, action_ret=1) == [
+    # No minions on map (count=0) + Fire Support (0x20000002): holds without Action.
+    assert run_hook(0x20000002, 0) == [
         ("get_instance", 0),
-        ("get_turn", 0x12340000),
+        ("get_opponent_camp", 0x12340000),
+        ("get_minions", 0),
+        ("exit_false", 0),
+    ]
+    assert state["action_calls"] == 0
+
+    # Minions spawned on map (count=3) + Fire Support (0x20000002): calls Action and exits true.
+    assert run_hook(0x20000002, 3, action_ret=1) == [
+        ("get_instance", 0),
+        ("get_opponent_camp", 0x12340000),
+        ("get_minions", 0),
         ("action", 0x20000002),
         ("exit_true", 0),
     ]
     assert state["action_calls"] == 1
 
-    # Odd UI turn (HUD Turn 1 -> turn_no=0) + Fire Support when Action returns 0: exits false.
-    assert run_hook(0x20000002, 0, action_ret=0)[-1] == ("exit_false", 0)
+    # Minions present when Action returns 0: exits false.
+    assert run_hook(0x20000002, 2, action_ret=0)[-1] == ("exit_false", 0)
 
-    # Combat Support (0x20000004) on even UI turn (turn_no=1 -> HUD Turn 2): fires immediately.
-    assert run_hook(0x20000004, 1, action_ret=1) == [("action", 0x20000004), ("exit_true", 0)]
-
-    # Fail-open when GameStage.instance is null.
-    assert run_hook(0x20000002, 1, stage_ptr=0, action_ret=1) == [
+    # Null target list returned by GetEnemyWithoutBossMultiTargets: holds without Action.
+    assert run_hook(0x20000002, 2, list_ptr=0) == [
         ("get_instance", 0),
+        ("get_opponent_camp", 0x12340000),
+        ("get_minions", 0),
+        ("exit_false", 0),
+    ]
+
+    # Combat Support (0x20000004) with 0 minions: fires immediately without checking stage.
+    assert run_hook(0x20000004, 0, action_ret=1) == [("action", 0x20000004), ("exit_true", 0)]
+
+    # Fail-open when GameStage.instance is null or opponentCamp is null.
+    assert run_hook(0x20000002, 0, stage_ptr=0, action_ret=1) == [
+        ("get_instance", 0),
+        ("action", 0x20000002),
+        ("exit_true", 0),
+    ]
+    assert run_hook(0x20000002, 0, camp_ptr=0, action_ret=1) == [
+        ("get_instance", 0),
+        ("get_opponent_camp", 0x12340000),
         ("action", 0x20000002),
         ("exit_true", 0),
     ]

@@ -387,7 +387,7 @@ def run_cli(args: argparse.Namespace) -> int:
         event_coin_x10=(args.all or args.event_coin_x10),
         guild_raid_score_fix=(args.all or args.guild_raid_score_fix),
         guild_raid_fire_support=(args.all or args.guild_raid_fire_support),
-        guild_raid_protection_persist=args.guild_raid_protection_persist,
+        guild_raid_protection_persist=(args.all or args.guild_raid_protection_persist),
         alex_heros_mark=(args.all or args.alex_heros_mark),
         guild_raid_skills_max=(args.all or args.guild_raid_skills_max),
         guild_raid_boss_no_counter=(args.all or args.guild_raid_boss_no_counter),

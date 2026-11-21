@@ -96,10 +96,10 @@ IDs are stable references, not positions: never renumber or reuse an ID. If a fe
 | 07.03 | Guild Raid own mercenary | `--guild-raid-mercenary` | `guild_raid_mercenary` | `var_guild_raid_mercenary` | Yes |
 | 07.04 | Guild Raid rewards x10 | `--guild-raid-reward-x10` | `guild_raid_reward_x10` | `var_guild_raid_reward_x10` | Yes |
 | 07.05 | Guild Raid 64-bit scores | `--guild-raid-score-fix` | `guild_raid_score_fix` | `var_guild_raid_score_fix` | Yes |
-| 07.06 | Guild Raid Fire Support 100% HP and odd-turn auto-cast | `--guild-raid-fire-support` | `guild_raid_fire_support` | `var_guild_raid_fire_support` | Yes |
+| 07.06 | Guild Raid Fire Support 100% HP and minion-aware auto-cast | `--guild-raid-fire-support` | `guild_raid_fire_support` | `var_guild_raid_fire_support` | Yes |
 | 07.07 | Guild Raid skills maxed (1M Shelling, 100% DR/HP/MP, 20 dispels) | `--guild-raid-skills-max` | `guild_raid_skills_max` | `var_guild_raid_skills_max` | Yes |
 | 07.08 | Guild Raid boss 0% counterattack rate | `--guild-raid-boss-no-counter` | `guild_raid_boss_no_counter` | `var_guild_raid_boss_no_counter` | Yes |
-| 07.09 | Guild Raid Absolute Protection persists for all hits (experimental — blocked by AppSealing anti-tamper) | `--guild-raid-protection-persist` | `guild_raid_protection_persist` | `var_guild_raid_protection_persist` | No (blocked) |
+| 07.09 | Guild Raid Absolute Protection persists for all hits | `--guild-raid-protection-persist` | `guild_raid_protection_persist` | `var_guild_raid_protection_persist` | Yes |
 
 07.03 uses the configured weekday hero; if absent or invalid, it keeps the
 selected guild mercenary. A hero without a costume remains valid. Socketed gem
@@ -115,6 +115,7 @@ bonuses are still under investigation and are not yet guaranteed.
 | 08.04 | LAN server redirect | `--lan` | `lan_redirect` | `net_mode_var` | No |
 | 08.05 | Allow non-reference APK | `--force` | `allow_unknown` | `var_force` | No |
 | 08.06 | Hero EXP cap and Limit Break floor | Always on | Built-in fix | None | Always |
+| 08.07 | Non-hex inventory sync guard (KB-001) | Always on | Built-in fix | None | Always |
 
 ## 12 — Original hero modifications
 
