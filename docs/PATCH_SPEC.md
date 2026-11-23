@@ -294,6 +294,13 @@ Status legend:
 | 52 | `guild_raid_protection_persist` | Absolute Protection Persists for All Hits | SO (runtime client patch) | mid-function hook `0xAB32F4` -> cave `0xB2AE18..0xB2AFC0` (424 B) patching client RVAs `0x1877C60` (`bl RemoveMultiTarget` -> `bl GetMultiTarget`), `0x1BAA2FC` (`b.lo -> nop`), and `0x1BAA318` (`b.ne -> nop`) via `PATCH_IL2CPP_HELPER` + `mprotect` fallback | Active (07.09; shipped in `--all`, protects all hits for full 1-turn duration) |
 | 51 | `hero_exp_cap` | Hero EXP Cap & Limit Break Floor | SO | `creature_level_max_value_json` floor `0x902008` -> `mov w20, #0x46 ; b 0x9020b8`; battle/expedition EXP hooks `0x80963C`, `0x81831C`, `0x945E30` -> cave `0xB2AD70` (`creature_max_total_exp_for_level_json`) | Always-on bug fix; prevents Lv71 EXP overflow and unlocks Limit Break for existing Lv71 un-transcended heroes |
 | 53 | `convert_hex_guard` | Non-Hex Inventory Sync Guard (KB-001) | SO (runtime client patch) | post-Covault installer `0xAB3370` -> cave `0xB2B098` patching `UtilFunc$$ConvertHexU32+0x94` (`0x0181178C`) to return `-1` on non-hex/`>8`-char `item_code` strings instead of throwing `FormatException` | Always-on bug fix (`08.07`); prevents `OnGetMyItemInfo` from aborting on corrupted template rows (`13000K`, `13000Y`) so later items (`2040031` Mythical Stones, `200002` Green Gems) load on restart |
+| 54 | `trait_max_quality` | Traits: Max Quality Rolls (Grade 5 / Pink) | SO | `kFwtPotentialDataRows` (`0x6CBBC8`, 393 rows × 68 B) + `kFwtPotentialGradeRows` (`0x6D242C`); 58 weighted `(potential_type, slot_phase)` pools concentrate 100% weight on grade-5 rows (`130` lower/top rows updated) | Active (13.01; keeps exact per-attribute odds while guaranteeing grade 5 on every Trait roll) |
+| 55 | `trait_allow_duplicates` | Allow Duplicate Hero Traits Across Slots | SO | `choose_potential_code_json` (`0x8BFDF0`), site `0x8BFF74` (`b.eq 0x8C00F0` -> `b 0x8C00F0`) | Active (13.02; bypasses cross-slot `potentialType` `std::set` exclusion while keeping `w4 = 1` current-slot `pt_code` exclusion) |
+| 56 | `limit_break_step_10` | Limit Break +10 Levels (to Lv 120) | SO + assets (`limitbreakcost.unity3d`) | `kFwtCreatureLimitBreakCosts` `0x756CF0`, 45 rows x 24 B, `level_after` (+4) / client `_levelAfter` set to `min(120, ((level_before // 10) + 1) * 10)` | Active (13.03; shipped by `--all`, orthogonal to cost profiles) |
+| 57 | `merlin_auto_support` | Merlin Slot-1 Auto Support (Magic infusion on Awake CD==1) | SO (runtime client patch) | post-Covault installer `0xAB3300` -> caves `0xB2B1B4..0xB2B530` (892 B) + `0xB2B620..0xB2B650` (48 B awake-CD trampoline calling client `0x1606428`) patching `AIStatePhaseFindSupport`/`InPlace` `IsUseSupportSkillState` (`0x20EDBCC`, `0x20F1AF0`) & `CompareFindTargetStep+0x178` (`0x20EEF2C`, `0x20F3338`) via `PATCH_IL2CPP_HELPER` | Active (14.01 + 14.02 + 14.03; Slot 1 + Auto Mode only, true remaining Awakening cooldown via `GetCurrentCoolTime`, skills before bonus/item cells, tie-break by strongest Awakening-skill damage instead of slot order, keeps healing rules & enemy fallback untouched) |
+| 58 | `trait_multi_unique` | Traits: Unique Attributes per Multi-Roll Batch | SO | `REQ_CHANGE_CREATURE_POTENTIAL` (`0x7FF69C`, `0x7FF7F4`) + `choose_potential_code_json` (`0x8BFE30`, `0x8C01E8`, `0x8C0524`, `0x8C07C8`) -> cave `0xB2B530..0xB2B620` (240 B) tracking a 63-bit batch `potentialType` bitmask in callee-saved `x27` | Active (13.04; shipped by `--all`, composes with `trait_allow_duplicates` `13.02`, falls back gracefully if candidates exhaust) |
+| 59 | `trait_immunity_weight_x2` | Traits: Double Immunity Weights (Slots 3-5) | SO | `kFwtPotentialDataRows` (`0x6CBBC8`) rows `300` (`id=35001, col=6`), `301` (`id=36001, col=12`), `302` (`id=37001, col=9`): stock weight `335` -> `20000` (2x normal `10000` stats) | Active (13.05; shipped by `--all`, orthogonal to `trait_max_quality` `13.01`) |
+| 60 | `dungeon_recom_info` | Mercenary Auto-Select Recommendations (`DUNGEON_RECOM_INFO`) | SO | `fwt::EmbeddedStub::handle_json_request` dispatch call `0x7DAED0` (`bl 0x7E4030`) -> cave `0xB301F8` (832 B, parseEncoding family): byte-scans the request for `"DUNGEON_RECOM_INFO"`, forwards other CMDs untouched, answers `recom_list` via `load_state_snapshot` (`0x7DDECC`) + `friend_list_json` (`0x8D5674`) + `int_field` packet_no echo (`0x7E08B8`), plain-ack fallback when the state cannot load | Always-on bug fix (08.08); the pre-battle "auto select" finally receives candidate mercenaries |
 
 Build & infrastructure fields on `PatchOptions` (not gameplay patches): `server_ip` / `server_port` (target endpoint when `lan_redirect` is enabled, defaults `127.0.0.1:8010`), `align_16k` (Android 16 KB page alignment, default `True`, disabled with `--no-16k`), `allow_unknown` (bypass reference-APK guard via `--force`), and `dev` (`DevOptions`, documented in [`docs/DEV_BUILD.md`](DEV_BUILD.md)).
 
@@ -1231,6 +1238,49 @@ bootstrap's integrity contract must be updated in the same build:
   client table is pinned by profile hash `48095e9a…`.
 - Reference count: **45** rows. Idempotent.
 
+#### 56. `limit_break_step_10` — Limit Break +10 Levels (to Lv 120)
+
+- Updates `level_after` (`+4`) across all **45** rows of `kFwtCreatureLimitBreakCosts`
+  (`0x756CF0`) to `min(120, ((level_before // 10) + 1) * 10)`: `70..78 -> 80`,
+  `80..88 -> 90`, `90..98 -> 100`, `100..108 -> 110`, `110..118 -> 120`.
+- `CREATURE_TRANSCEND` reads `row.level_after` (`[x21, #4]`) directly into
+  `CreatureTranscendStateAccess::transcend`, while keeping the single-row gold and
+  material cost independent of the jump size so it composes cleanly with stock
+  costs, `limit_break_cost_tenth`, or `limit_break_cost_fixed`.
+- Client side: `core.apk_tooling` updates `_levelAfter` in
+  `files/Resources/datatable/limitbreakcost.unity3d` to match; `LimitBreakCostManager`,
+  `HeroInfoLimitBreakPopupGUI`, and `LimitBreakDataManager` read `_levelAfter` and
+  Lv 71–120 stats dynamically.
+- Orthogonal to both cost profiles; `--all` ships this option (`13.03`).
+- Reference count: **45** rows. Idempotent.
+
+#### 57. `merlin_auto_support` — Merlin Slot-1 Auto Support (Magic infusion)
+
+- Post-Covault runtime client installer at `0xAB3300` (`stlrb w8, [x9]` -> `bl 0xB2B1B4`, between `0xAB32F4` and `0xAB3304`) inside the unused `AbstractManglingParser::parseName` tail (`0xB2B1B4..0xB2B530`, 892 B), plus a 48 B awake-cooldown trampoline cave at `0xB2B620..0xB2B650` in the same function's remaining free tail.
+- Installs four 4-word absolute trampolines into `libil2cpp.so` via `PATCH_IL2CPP_HELPER` (`0xAB575C`, reading `IL2CPP_BASE_CACHE` at `0xBE3798`):
+  - `AIStatePhaseFindSupport::IsUseSupportSkillState` (`0x20EDBCC`)
+  - `AIStatePhaseFindSupportInPlace::IsUseSupportSkillState` (`0x20F1AF0`)
+  - `AIStatePhaseFindSupport::CompareFindTargetStep+0x178` (`0x20EEF2C`)
+  - `AIStatePhaseFindSupportInPlace::CompareFindTargetStep+0x178` (`0x20F3338`)
+- Triggers exclusively when `skillData._skillId == 1053188` (*Magic infusion*), `Character._characterType == 0`, `Player._isAutoPlay != 0`, `Camp._campType == 0`, and `Camp._members[0] == caster` (Slot 1).
+- Accepts living allies (`target != caster`, `_isDead == 0`) carrying an Awakening skill (`(byte[skillData + 0x4d] | 1) == 5`) whose **true remaining cooldown == 1** — the `0xB2B3CC` check tail-calls client RVA `0x1606428` (`IsAwakeningSkill(skill) ? Skill::GetCurrentCoolTime(skill) : -1`) through the `0xB2B620` trampoline, because `[Skill + 0x30]` is a turns-elapsed counter (`Skill::ResetRemainCoolTime` `0x1B718E0` stores `0`), not the remaining cooldown — breaking ties among reachable targets by lowest team slot index in `Camp._members` (superseded by **14.03**, which ranks them by Awakening-skill damage instead). All HP/MP healing skills, manual play, Slots 2+, mercenaries, and non-player units keep stock AI; if all qualifying allies are out of range, normal attack AI runs.
+- Reference count: **4** (1 hook site + 3 caves). Idempotent.
+- **14.02 — skills before cells (same option)**: the 14.01 installer ends by branching (`0xB2B244`: `ret` -> `b 0xB30538`) into a 1112-byte cave in the dead `parseEncoding` tail right after `dungeon_recom_info`, which installs a fifth 4-word absolute trampoline at the `MoveEnableToTile` call site of `CharactersAI::InitActing` (client `0x1A35F68`, expected words `F9400268 AA1303E0 F9419109 F9419501`, verified against the decrypted client image). The 16-byte replacement is composed **at runtime** — `movz`/`movk` write `ldr x16, #8` and `br x16` into a stack buffer, and `adr x9, installer_entry` + `add x9, x9, #0xA8` supplies the body address — because a static `.quad` keeps the link-time VA and branches into unmapped memory (on-device `SIGSEGV` at `pc = 0xB305E0`). The body runs before the tile move and: (a) guards on Slot 1 / player camp / Auto Mode / non-semi-auto (`appointedTile == 0`, `appointedSkillIdx == -1`); (b) locates *Magic infusion* (`1053188`) in the descending scan (`[ai+0x7c]`..`[ai+0x80]`, skipping `preUsedSkillIndex`); (c) runs the **stock pair** (`CharactersAI::IsEnableUsingSkill` + virtual `EnableUseSkillToTarget`, `useportal = 1`) for every index above it — for Merlin that is the Awakening attack `1053189` in slot 4, which therefore beats the cell move; (d) runs the stock **support branch only** for *Magic infusion* (`AIStatePhaseFindSupport` object + ctor + controller `SetState`/`Execute`/`IsExecuted`, deliberately without the `FindAttackPlayer` fallback). A success resumes the client at `0x1A35F7C` (tile move skipped); any failure replays the four displaced words and resumes at `0x1A35F78` (stock). Merlin's ordinary attacks in slots 0/1 keep losing to the cell, as in stock; manual play, Slots 2+, mercenaries, monsters and PvP defense never reach the body's calls. Static client data (`0x3CD46E5`, `0x39AD548`, `0x39D78A0`) is addressed as `IL2CPP_BASE_CACHE + RVA`, never with a PC-relative `adrp`, because the body lives in the server library.
+- **14.03 — strongest Awakening wins the tie (same option)**: the two cross-ally calls inside the 14.01 `CompareFindTargetStep + 0x178` body (`0xB2B468` / `0xB2B474`, both `bl slot_index_in_camp` at `0xB2B2F0`) are repointed to `awaken_power` at `0xB3088C` (cave offset `0x354`, appended after the 14.02 body; the cave grows 852 -> 1112 B). Only the two `bl` words change — the existing `cmp w0, w13` / `b.lt accept` sequence keeps meaning "lower rank wins" because the helper returns `0x7FFF - power`, and `0x7FFF` is exactly the "not found" value the old helper returned. Power is the summed damage multiplier of the ally's Awakening skill: the helper scans `Character._skills` (`[+0x40]` container, `[+0x18]` array, `[+0x18]` count, `[+0x20 + 8*i]` entries) for the skill whose `SkillData._useParameterKind` (`+0x4D`) satisfies `(v | 1) == 5`, then walks `SkillData._effect01..04` (`+0x3C`, `+0x40`, `+0x44`, `+0x48`), resolves each id through `SkillEffectTableManager::GetData` (client `0x202730C`) and adds `_effectValue` (`+0x38`, float, `4.25` = 425%) of every row whose `_skillEffectType` (`+0x20`) is `0` (damage). Values are scaled by 100 and truncated (`fmul` + `fcvtzs`) so the sum stays integral; non-damage effects (stun, heal, buff), unknown ids and allies without an Awakening skill contribute nothing, so a support Awakening always loses to a damaging one. Because the comparison ignores tile distance, two reachable allies are now chosen by hitting power regardless of how many steps each needs; equal power falls through to the stock distance rule (and to slot order for the same ally across tiles). PvE and PvP use the same rule — the 14.01 guard already restricts it to the player's Slot-1 Merlin in Auto Mode.
+
+#### 58. `trait_multi_unique` — Traits: Unique Attributes per Multi-Roll Batch
+
+- Hooks the 10-roll batch loop in `REQ_CHANGE_CREATURE_POTENTIAL` (`0x7FF69C`, `0x7FF7F4`) and `choose_potential_code_json` (`0x8BFE30`, `0x8C01E8`, `0x8C0524`, `0x8C07C8`) into a 240 B code cave at `0xB2B530..0xB2B620` inside the unused `AbstractManglingParser::parseName` tail.
+- Tracks a 63-bit bitmask of already-rolled `potentialType`s in callee-saved `x27`, passing `(x27 << 1) | 1` into `x4` and storing full 64-bit `x4` at `[sp, #0x40]` so bit `0` keeps the stock `w4 = 1` current-slot `pt_code` exclusion while upper bits filter both Pass 1 (`0x8C01E8`) and Pass 2 (`0x8C0524`).
+- Leaves single-roll callers (`w4 = 0` or `1`, upper bits zero) and `trait_allow_duplicates` (`13.02`) untouched. If a modded table exhausts unique candidates in Pass 2 (`0x8C07C8`), clears `[sp, #0x40]`'s batch mask while preserving bit `0` and replays Pass 2 once unconstrained.
+- Reference count: **7** (1 cave + 6 hook sites). Idempotent.
+
+#### 59. `trait_immunity_weight_x2` — Traits: Double Immunity Weights (Slots 3-5)
+
+- Increases immunity Trait roll weights in `kFwtPotentialDataRows` (`0x6CBBC8`, 393 rows × 68 B) for Slots 3, 4, and 5: row `300` (`id = 35001`, `potentialType = 35`, col `6`), row `301` (`id = 36001`, `potentialType = 36`, col `12`), and row `302` (`id = 37001`, `potentialType = 37`, col `9`) from stock `335` to `20000` (2× normal stat weight `10000`).
+- Each immunity pool has a single grade-5 row, so this patch commutes cleanly with `trait_max_quality` (`13.01`).
+- Reference count: **3** rows. Idempotent.
+
 #### 46. `soulgear_enchant_always` — Soulgear Enchant Always Succeeds
 
 - `SoulgearGrowthStateAccess::apply` evaluates an FNV-1a roll against the
@@ -1299,6 +1349,52 @@ bootstrap's integrity contract must be updated in the same build:
 - Reference count: **2** (hook site + cave). Idempotent; composes with
   07.06/07.07/07.08 (standalone: the stock level-scaled magnitude persists
   for all hits for 1 turn).
+
+#### 60. `dungeon_recom_info` — Mercenary Auto-Select Recommendations (`DUNGEON_RECOM_INFO`)
+
+- The stock embedded server is one of the protocol's "cascas": it never
+  implements `DUNGEON_RECOM_INFO`, answering the generic
+  `{"CMD":..,"packet_no":..,"ERROR":0,"msg":""}` ack. The client's
+  `Result_DUNGEON_RECOM_INFO` parses `recom_list` to rank candidate friend
+  mercenaries for the pre-battle "auto select" — with the stock ack there is
+  never a candidate, so no mercenary is picked automatically even though
+  manual selection (via `GET_FRIEND_LIST`, 164 KB of friends) works.
+- The cave wraps the only dispatch call in
+  `fwt::EmbeddedStub::handle_json_request` (`0x7DAED0`, `bl 0x7E4030`,
+  original word `0x94002458`). At that site `x8` is the response sret
+  buffer, `x0` the config whose first member is the state-path
+  `std::string`, and `x1` the request `std::string` (libc++ SSO layout:
+  byte0 bit0 set -> long, size at +8, data at +0x10; else size = byte0>>1,
+  characters inline at +1).
+- Fast path: the cave byte-scans the request payload for
+  `"DUNGEON_RECOM_INFO"` (two qword compares + one halfword per position,
+  `x8/x0/x1` and the link register untouched) and forwards every other CMD
+  to the stock dispatcher — one short scan of overhead per request.
+- Matched path: echoes `packet_no` through the server's own `int_field`
+  (`0x7E08B8`, default 900), loads the state via `load_state_snapshot`
+  (`0x7DDECC`; `+0x00` valid byte, `+0x08` state JSON string), builds
+  `recom_list` with `friend_list_json` (`0x8D5674`, key `"friends"` — the
+  same source `GET_FRIEND_LIST` serves as `friend_lists` and `START_GAME`
+  as `recommend_list`), and assembles the response with
+  `basic_string(char const*)` (`0x7DBFB0`), `operator+` (`0x7E1750`) and
+  `~basic_string` (`0xAD913C`); the final concatenation lands directly in
+  the caller's sret.
+- Fallback: when the snapshot's valid byte is 0 the cave answers the plain
+  ack (no `recom_list`), exactly the stock behavior, without destroying the
+  (never constructed) snapshot.
+- Cave host: `0xB301F8` in the unused
+  `itanium_demangle::AbstractManglingParser::parseEncoding` body (3620 B,
+  demangler-only profile — the same dead-code family as the shipped
+  campaign caves); 832 bytes, rebuilt by
+  `tools/gen_dungeon_recom_cave.py`, embedded in
+  `core/dungeon_recom_info.py`.
+- Emulated end-to-end with Unicorn (both string layouts, passthrough
+  register/ABI preservation, matched response bytes, plain-ack fallback,
+  edge-length payloads, single-digit packet_no echo) in
+  `tests/test_dungeon_recom_info.py`; validated against the reference APK
+  stock bytes and `patch_inspector`.
+- Reference count: **2** (hook site + cave). Always-on bug fix (08.08), no
+  CLI flag and no GUI control; idempotent.
 
 ---
 

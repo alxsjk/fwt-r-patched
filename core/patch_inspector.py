@@ -160,6 +160,14 @@ from core.core_patches import (
     NO_WIN_BOX_SITE,
     PATCH_FLAG_SIZE,
     PATCH_FLAG_VADDR,
+    POTENTIAL_DEDUP_ORIGINAL,
+    POTENTIAL_DEDUP_REPLACEMENT,
+    POTENTIAL_DEDUP_SITE,
+    POTENTIAL_IMMUNITY_ROWS,
+    POTENTIAL_IMMUNITY_WEIGHT,
+    POTENTIAL_MULTI_UNIQUE_CAVE_BYTES,
+    POTENTIAL_MULTI_UNIQUE_CAVE_SIZE,
+    POTENTIAL_MULTI_UNIQUE_CAVE_VADDR,
     PVP_TEAM_COMPACT_ATTACK_CAVE_BYTES,
     PVP_TEAM_COMPACT_ATTACK_CAVE_VADDR,
     PVP_TEAM_COMPACT_ATTACK_HOOK,
@@ -271,6 +279,11 @@ from core.core_patches import (
     _stage_prefix,
     encode_arm64_branch,
     find_dev_build_marker,
+    inspect_limit_break_table,
+    limit_break_step10_state,
+    potential_immunity_weight_state,
+    potential_multi_unique_sites,
+    potential_top_quality_state,
     randoption_top_quality_state,
     recycle_six_star_assignment,
     rune_roll_cave_blob,
@@ -279,10 +292,18 @@ from core.core_patches import (
 )
 from core.costume_packages import inspect_costume_packages
 from core.dex_smali import read_dex_strings
+from core.dungeon_recom_info import (
+    CAVE_VADDR as DUNGEON_RECOM_INFO_CAVE_VADDR,
+)
+from core.dungeon_recom_info import (
+    HOOK_VADDR as DUNGEON_RECOM_INFO_HOOK_SITE,
+)
+from core.dungeon_recom_info import inspect_dungeon_recom_info
 from core.equipment_tier_upgrades import inspect_equipment_tiers
 from core.guild_raid_fire_support import inspect_guild_raid_fire_support
 from core.guild_raid_protection_persist import inspect_guild_raid_protection_persist
 from core.hero_shop_offers import inspect_hero_shop_offers
+from core.merlin_auto_support import inspect_merlin_auto_support
 from core.mythical_shop import inspect_mythical_shop
 from core.surprise_transcendence_package import inspect_surprise_transcendence_package
 
@@ -944,6 +965,130 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             str(exc),
         )
 
+    # 8a-ter. Hero trait rolls keep each pool's top quality (grade 5)
+    try:
+        pending, pools = potential_top_quality_state(so_bytes)
+        active = pools > 0 and not pending
+        _feature(
+            reports,
+            "trait_max_quality",
+            "Traits: Max Quality Rolls",
+            active,
+            (
+                "Active (every pool rolls grade 5 / pink)"
+                if active
+                else ("Original (mixed trait grades)" if pools else "Unknown")
+            ),
+            f"{pools} trait pool(s); {len(pending)} row(s) below grade 5 weighted",
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "trait_max_quality",
+            "Traits: Max Quality Rolls",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
+    # 8a-quater. Allow duplicate hero trait types across slots
+    try:
+        offset = seg_offset(POTENTIAL_DEDUP_SITE)
+        current = bytes(so_bytes[offset:offset + len(POTENTIAL_DEDUP_REPLACEMENT)])
+        active = current == POTENTIAL_DEDUP_REPLACEMENT
+        stock = current == POTENTIAL_DEDUP_ORIGINAL
+        _feature(
+            reports,
+            "trait_allow_duplicates",
+            "Allow Duplicate Hero Traits",
+            active,
+            (
+                "Active (cross-slot type dedup bypassed)"
+                if active
+                else ("Original (unique trait types per hero)" if stock else "Unknown")
+            ),
+            (
+                f"site 0x{POTENTIAL_DEDUP_SITE:x}: {current.hex()} "
+                f"(original {POTENTIAL_DEDUP_ORIGINAL.hex()})"
+            ),
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "trait_allow_duplicates",
+            "Allow Duplicate Hero Traits",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
+    # 8a-quinquies. Multi-roll hero trait batches never repeat attribute types
+    try:
+        sites = potential_multi_unique_sites()
+        cave_off = seg_offset(POTENTIAL_MULTI_UNIQUE_CAVE_VADDR)
+        cave_ok = (
+            bytes(so_bytes[cave_off : cave_off + POTENTIAL_MULTI_UNIQUE_CAVE_SIZE])
+            == POTENTIAL_MULTI_UNIQUE_CAVE_BYTES
+        )
+        site_states = [
+            (
+                bytes(so_bytes[seg_offset(site) : seg_offset(site) + len(repl)]) == repl,
+                bytes(so_bytes[seg_offset(site) : seg_offset(site) + len(repl)]) == orig,
+            )
+            for _label, site, orig, repl in sites
+        ]
+        active = cave_ok and all(is_repl for is_repl, _is_orig in site_states)
+        stock = all(is_orig for _is_repl, is_orig in site_states)
+        _feature(
+            reports,
+            "trait_multi_unique",
+            "Traits: Unique Batch Rolls",
+            active,
+            (
+                "Active (multi-roll batch excludes duplicate types)"
+                if active
+                else ("Original (multi-roll batch can repeat types)" if stock else "Unknown")
+            ),
+            f"cave 0x{POTENTIAL_MULTI_UNIQUE_CAVE_VADDR:x} ({POTENTIAL_MULTI_UNIQUE_CAVE_SIZE} B); "
+            f"{sum(1 for r, _o in site_states if r)}/{len(sites)} hook sites active",
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "trait_multi_unique",
+            "Traits: Unique Batch Rolls",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
+    # 8a-sexies. Double immunity trait weights in Slots 3..5
+    try:
+        patched_imm, orig_imm, total_imm = potential_immunity_weight_state(bytes(so_bytes))
+        active = patched_imm == total_imm and total_imm == len(POTENTIAL_IMMUNITY_ROWS)
+        stock = orig_imm == total_imm
+        _feature(
+            reports,
+            "trait_immunity_weight_x2",
+            "Traits: Immunity Weight x2 (Slots 3-5)",
+            active,
+            (
+                f"Active (Slots 3-5 immunity weight = {POTENTIAL_IMMUNITY_WEIGHT:,})"
+                if active
+                else ("Original (stock immunity weight 335)" if stock else "Unknown")
+            ),
+            f"{patched_imm}/{total_imm} immunity rows at weight {POTENTIAL_IMMUNITY_WEIGHT}",
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "trait_immunity_weight_x2",
+            "Traits: Immunity Weight x2 (Slots 3-5)",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
     # 8a-bis. Rune option quality
     try:
         offset = seg_offset(RUNE_OPTION_MASTERY_SITE)
@@ -986,10 +1131,12 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
     try:
         cost_offset = seg_offset(LIMIT_BREAK_GOLD_TABLE)
         cost_size = LIMIT_BREAK_GOLD_ROW_SIZE * LIMIT_BREAK_GOLD_ROWS
-        cost_digest = hashlib.sha256(
+        cost_digest, step_mode = inspect_limit_break_table(
             bytes(so_bytes[cost_offset:cost_offset + cost_size])
-        ).hexdigest()
-        cost_active = cost_digest == LIMIT_BREAK_COST_TENTH_SHA256
+        )
+        cost_active = (
+            step_mode != "unknown" and cost_digest == LIMIT_BREAK_COST_TENTH_SHA256
+        )
         _feature(
             reports,
             "limit_break_cost_tenth",
@@ -1016,10 +1163,12 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
     try:
         cost_offset = seg_offset(LIMIT_BREAK_GOLD_TABLE)
         cost_size = LIMIT_BREAK_GOLD_ROW_SIZE * LIMIT_BREAK_GOLD_ROWS
-        cost_digest = hashlib.sha256(
+        cost_digest, step_mode = inspect_limit_break_table(
             bytes(so_bytes[cost_offset:cost_offset + cost_size])
-        ).hexdigest()
-        fixed_active = cost_digest == LIMIT_BREAK_COST_FIXED_SHA256
+        )
+        fixed_active = (
+            step_mode != "unknown" and cost_digest == LIMIT_BREAK_COST_FIXED_SHA256
+        )
         _feature(
             reports,
             "limit_break_cost_fixed",
@@ -1038,6 +1187,27 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             reports,
             "limit_break_cost_fixed",
             "Limit Break Fixed Cost",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
+    # 8a-novies. Hero limit break opens +10 levels per step (up to Lv 120)
+    try:
+        step10_active, step10_detail = limit_break_step10_state(so_bytes)
+        _feature(
+            reports,
+            "limit_break_step_10",
+            "Limit Break +10 Levels",
+            step10_active,
+            "Active (+10 levels per break to Lv 120)" if step10_active else "Original (+2 levels)",
+            step10_detail,
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "limit_break_step_10",
+            "Limit Break +10 Levels",
             False,
             "Unknown",
             str(exc),
@@ -1179,6 +1349,27 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             reports,
             "convert_hex_guard",
             "Non-Hex Inventory Sync Guard (KB-001)",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
+    # 8a-septies-c. DUNGEON_RECOM_INFO mercenary auto-select fix
+    try:
+        active = inspect_dungeon_recom_info(so_bytes, seg_offset)
+        _feature(
+            reports,
+            "dungeon_recom_info",
+            "Mercenary Auto-Select Recommendations (DUNGEON_RECOM_INFO)",
+            active,
+            "Patched (recom_list served from friends)" if active else "Original",
+            f"hook 0x{DUNGEON_RECOM_INFO_HOOK_SITE:x}, cave 0x{DUNGEON_RECOM_INFO_CAVE_VADDR:x} checked",
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "dungeon_recom_info",
+            "Mercenary Auto-Select Recommendations (DUNGEON_RECOM_INFO)",
             False,
             "Unknown",
             str(exc),
@@ -1673,6 +1864,28 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             reports,
             "guild_raid_protection_persist",
             "Guild Raid Absolute Protection Persists for All Hits",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
+    # 12q. Merlin Slot-1 Auto Support Check
+    try:
+        active = inspect_merlin_auto_support(so_bytes, seg_offset)
+        _feature(
+            reports,
+            "merlin_auto_support",
+            "Merlin Slot-1 Auto Support (Magic infusion on Awake CD==1)",
+            active,
+            "Active (Slot-1 Auto Magic infusion on Awake CD==1)" if active else "Original",
+            "0xAB3300 -> 0xB2B1B4 hook + 0xB2B620 cooldown-helper cave + 0xB30538"
+            " skill-priority cave + 0xB3088C awaken-power tie-break checked",
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "merlin_auto_support",
+            "Merlin Slot-1 Auto Support (Magic infusion on Awake CD==1)",
             False,
             "Unknown",
             str(exc),
@@ -2949,6 +3162,7 @@ def _inspect_apk_resources(
         inspect_guild_raid_fire_support_assets,
         inspect_guild_raid_skills_max_assets,
         inspect_limit_break_cost_assets,
+        inspect_limit_break_step_assets,
         inspect_mode_drops_assets,
         inspect_recycle_six_star_assets,
         inspect_rune_option_assets,
@@ -3012,6 +3226,13 @@ def _inspect_apk_resources(
             "Active (percentage rows only)",
             inspect_rune_option_assets,
             "assets/fwt_resources_v1.zip is missing; runeoption.unity3d unchecked",
+        ),
+        (
+            "limit_break_step_10",
+            "Limit Break +10 Levels",
+            "Active (+10 levels per break to Lv 120)",
+            inspect_limit_break_step_assets,
+            "assets/fwt_resources_v1.zip is missing; limitbreakcost.unity3d unchecked",
         ),
     ):
         if inner_zip is None:
@@ -3409,6 +3630,14 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
         expected["energy_flask_x10"] = "Energy Flask x10 Stamina"
     if options.option_max_attributes:
         expected["option_max_attributes"] = "Option Max Quality Rolls"
+    if options.trait_max_quality:
+        expected["trait_max_quality"] = "Traits: Max Quality Rolls"
+    if options.trait_allow_duplicates:
+        expected["trait_allow_duplicates"] = "Allow Duplicate Hero Traits"
+    if options.trait_multi_unique:
+        expected["trait_multi_unique"] = "Traits: Unique Batch Rolls"
+    if options.trait_immunity_weight_x2:
+        expected["trait_immunity_weight_x2"] = "Traits: Immunity Weight x2 (Slots 3-5)"
     if options.equipment_lock_fix:
         expected["equipment_lock_fix"] = "Equipment Option Locks"
     if options.equipment_single_mod_stone:
@@ -3421,12 +3650,17 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
         expected["limit_break_cost_tenth"] = "Limit Break Cost (90% Off)"
     if options.limit_break_cost_fixed:
         expected["limit_break_cost_fixed"] = "Limit Break Fixed Cost"
+    if options.limit_break_step_10:
+        expected["limit_break_step_10"] = "Limit Break +10 Levels"
     if options.soulgear_enchant_always:
         expected["soulgear_enchant_always"] = "Soulgear Enchant Always Succeeds"
     # Bug fixes applied to every build, not options.
     expected["no_win_box"] = "Hide Phantom Win Boxes"
     expected["hero_exp_cap"] = "Hero EXP Cap & Limit Break Floor"
     expected["convert_hex_guard"] = "Non-Hex Inventory Sync Guard (KB-001)"
+    expected["dungeon_recom_info"] = (
+        "Mercenary Auto-Select Recommendations (DUNGEON_RECOM_INFO)"
+    )
     if options.rune_box_random_type:
         expected["rune_box_random_type"] = "4★ Rune Box Random Type"
     if options.rune_quality_factor:
@@ -3466,6 +3700,10 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
     if options.guild_raid_protection_persist:
         expected["guild_raid_protection_persist"] = (
             "Guild Raid Absolute Protection Persists for All Hits"
+        )
+    if options.merlin_auto_support:
+        expected["merlin_auto_support"] = (
+            "Merlin Slot-1 Auto Support (Magic infusion on Awake CD==1)"
         )
     if options.guild_raid_skills_max:
         expected["guild_raid_skills_max"] = "Guild Raid Skills Maxed (1M / 100%)"

@@ -92,6 +92,7 @@ def test_grouped_catalog_covers_options_flags_and_documentation() -> None:
         "no_win_box",
         "hero_exp_cap",
         "convert_hex_guard",
+        "dungeon_recom_info",
     }
     assert {field.removeprefix("dev.") for field in fields if field.startswith("dev.")} == {
         field.name for field in dataclasses.fields(DevOptions)
@@ -107,7 +108,7 @@ def test_grouped_catalog_covers_options_flags_and_documentation() -> None:
         assert len(row.strip("|").split("|")) == 6
         assert feature.name in row
         assert feature.cli in row or feature.cli == "always on" and "Always on" in row
-        assert feature.field in row or feature.field in {"no_win_box", "hero_exp_cap", "convert_hex_guard"} and "Built-in fix" in row
+        assert feature.field in row or feature.field in {"no_win_box", "hero_exp_cap", "convert_hex_guard", "dungeon_recom_info"} and "Built-in fix" in row
         variable = feature.variable or {"lan_redirect": "net_mode_var", "allow_unknown": "var_force"}.get(feature.field)
         assert (variable is None and "None" in row) or (variable is not None and f"`{variable}`" in row)
 
@@ -269,6 +270,12 @@ def test_gui_option_vars_wire_all_features_and_preserve_exclusions(
         ("var_stamina_potion_1000", "stamina_potion_1000", True),
         ("var_align_16k", "align_16k", True),
         ("var_alex_rebalance", "alex_rebalance", True),
+        ("var_trait_max_quality", "trait_max_quality", True),
+        ("var_trait_allow_duplicates", "trait_allow_duplicates", True),
+        ("var_trait_multi_unique", "trait_multi_unique", True),
+        ("var_trait_immunity_weight_x2", "trait_immunity_weight_x2", True),
+        ("var_limit_break_step_10", "limit_break_step_10", True),
+        ("var_merlin_auto_support", "merlin_auto_support", True),
     ]
     for var_attr, field_name, enabled_val in var_to_field:
         var = getattr(window, var_attr)

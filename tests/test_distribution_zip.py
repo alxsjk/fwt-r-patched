@@ -207,6 +207,11 @@ def test_stage_apk_only_accepts_patched_apk_and_main_default(
                 active=True,
                 status="Patched (returns -1 on non-hex item_code)",
             ),
+            "dungeon_recom_info": FeatureReport(
+                name="Mercenary Auto-Select Recommendations (DUNGEON_RECOM_INFO)",
+                active=True,
+                status="Patched (recom_list served from friends)",
+            ),
             "campaign_gold": FeatureReport(
                 name="10x Campaign Gold & Drops",
                 active=True,

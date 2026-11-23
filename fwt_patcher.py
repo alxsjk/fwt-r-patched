@@ -364,6 +364,11 @@ def run_cli(args: argparse.Namespace) -> int:
         recycle_six_star=(args.all or args.recycle_six_star),
         energy_flask_x10=(args.all or args.energy_flask_x10),
         option_max_attributes=(args.all or args.option_max_attributes),
+        trait_max_quality=(args.all or args.trait_max_quality),
+        trait_allow_duplicates=(args.all or args.trait_allow_duplicates),
+        trait_multi_unique=(args.all or args.trait_multi_unique),
+        trait_immunity_weight_x2=(args.all or args.trait_immunity_weight_x2),
+        merlin_auto_support=(args.all or args.merlin_auto_support),
         rune_box_random_type=(args.all or args.rune_box_random_type),
         rune_box_random_roll=(args.all or args.rune_box_random_roll),
         equipment_lock_fix=(args.all or args.equipment_lock_fix),
@@ -374,6 +379,7 @@ def run_cli(args: argparse.Namespace) -> int:
         ),
         limit_break_cost_tenth=limit_cost_tenth,
         limit_break_cost_fixed=limit_cost_fixed,
+        limit_break_step_10=(args.all or args.limit_break_step_10),
         soulgear_enchant_always=(args.all or args.soulgear_enchant_always),
         rune_quality_factor=(
             args.rune_quality_factor
@@ -675,6 +681,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--energy-flask-x10", action="store_true", help="Energy Flask awards 1000 stamina instead of 100 (keeps the 12-15h and 18-21h windows)")
     parser.add_argument("--option-max-attributes", action="store_true", help="Option-change potions roll with the maximum quality bias (best attributes)")
+    parser.add_argument("--trait-max-quality", action="store_true", help="Hero Trait (potential) rolls always land on the highest grade (pink / grade 5) while keeping attribute odds")
+    parser.add_argument("--trait-allow-duplicates", action="store_true", help="Allow rolling hero Trait types already saved in other slots (e.g. multiple +Crit Rate slots)")
+    parser.add_argument("--trait-multi-unique", action="store_true", help="Prevent multi-roll hero Trait batches from returning duplicate attribute types in the same roll list")
+    parser.add_argument("--trait-immunity-weight-x2", action="store_true", help="Double immunity Trait roll weights in Slots 3, 4, and 5 (20,000 vs 10,000 normal stats)")
     parser.add_argument("--rune-box-random-type", action="store_true", help="The 4-star random rune box rolls any of the three basic rune types instead of a single rejected one")
     parser.add_argument("--soulgear-enchant-always", action="store_true", help="Gold-paid soulgear enchant succeeds every time (soulgear upgrade has no roll)")
     parser.add_argument("--equipment-lock-fix", action="store_true", help="Locked equipment option lines survive the first roll (the handler used to re-roll them before reading lock_list)")
@@ -724,6 +734,12 @@ def build_parser() -> argparse.ArgumentParser:
     limit_break_group = parser.add_mutually_exclusive_group()
     limit_break_group.add_argument("--limit-break-cost-tenth", action="store_true", help="Reduce hero limit break (Awake) gold and material cost by 90%%")
     limit_break_group.add_argument("--limit-break-cost-fixed", action="store_true", help="Charge a flat 1,000,000 gold and 100 Balance Jade for every hero limit break (overrides the 90%% discount)")
+    parser.add_argument("--limit-break-step-10", action="store_true", help="Open +10 levels per hero limit break up to Lv 120 (70->80->90->100->110->120)")
+    parser.add_argument(
+        "--merlin-auto-support",
+        action="store_true",
+        help="When Merlin is in Slot 1 in Auto Mode, cast Magic infusion on reachable allies whose Awakening skill cooldown is 1 (slot order tie-break)",
+    )
     parser.add_argument("--coocoo-exp-x2", action="store_true", help="Always apply the x2 EXP bonus when leveling heroes with coocoos")
     parser.add_argument("--coocoo-level-x2", action="store_true", help="Double the coocoo levels dropped by the 30 Coocoo Garden / Pit of Nephthys stages (final stage 220 -> 440)")
     parser.add_argument(

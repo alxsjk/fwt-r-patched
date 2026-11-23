@@ -673,6 +673,12 @@ class MainWindow(tk.Tk):
         self.var_gem_upgrade_gold_half = tk.BooleanVar(value=True)
         self.var_stamina_cost_half = tk.BooleanVar(value=True)
         self.var_stamina_potion_1000 = tk.BooleanVar(value=True)
+        self.var_trait_max_quality = tk.BooleanVar(value=True)
+        self.var_trait_allow_duplicates = tk.BooleanVar(value=True)
+        self.var_trait_multi_unique = tk.BooleanVar(value=True)
+        self.var_trait_immunity_weight_x2 = tk.BooleanVar(value=True)
+        self.var_limit_break_step_10 = tk.BooleanVar(value=True)
+        self.var_merlin_auto_support = tk.BooleanVar(value=True)
         self.var_align_16k = tk.BooleanVar(value=True)
 
     def _bind_option_exclusions(self) -> None:
@@ -763,6 +769,12 @@ class MainWindow(tk.Tk):
             (self.var_gem_upgrade_gold_half, "50% Off Gem Upgrade Gold", "Halves the gold fee charged by lobby gem upgrades while keeping the duplicate/consumable cost unchanged"),
             (self.var_stamina_cost_half, "50% Dungeon Stamina Cost (default)", "Server-side half debit used by --all; the client may still display/validate the full cost"),
             (self.var_stamina_potion_1000, "Stamina Potion Restores 1000", "Makes normal Stamina Potions restore 1000 points instead of the current max stamina"),
+            (self.var_trait_max_quality, "Traits: Max Quality Rolls", "Every hero Trait roll lands on the highest grade (pink / grade 5) while keeping each attribute's original odds"),
+            (self.var_trait_allow_duplicates, "Allow Duplicate Hero Traits", "Bypasses cross-slot trait type exclusion so multiple slots on the same hero can share a stat (e.g. +400 Crit Rate)"),
+            (self.var_trait_multi_unique, "Traits: Unique Batch Rolls", "Multi-roll Trait batches (10x change) never repeat the same attribute twice in one rolled list"),
+            (self.var_trait_immunity_weight_x2, "Traits: Immunity Weight x2 (Slots 3-5)", "Doubles Slot 3..5 immunity trait weights (20,000 vs 10,000 normal stats, up from 335)"),
+            (self.var_limit_break_step_10, "Limit Break +10 Levels (to Lv 120)", "Each Limit Break opens +10 levels at once up to Lv 120 (70->80->90->100->110->120)"),
+            (self.var_merlin_auto_support, "Merlin Slot-1 Auto Support (Magic infusion)", "When Merlin is in Slot 1 in Auto Mode, casts Magic infusion on reachable allies whose Awakening skill cooldown is 1 (slot order tie-break; attacks normally if out of range)"),
             (self.var_align_16k, "Android 16 / 16 KB Page Alignment", "Aligns shared libraries to 16 KB boundaries for HyperOS / Android 16"),
         ]
 
@@ -1707,6 +1719,12 @@ class MainWindow(tk.Tk):
             alex_awakening=self.var_alex_awakening.get(),
             alex_rebalance=self.var_alex_rebalance.get(),
             alex_heros_mark=self.var_alex_heros_mark.get(),
+            trait_max_quality=self.var_trait_max_quality.get(),
+            trait_allow_duplicates=self.var_trait_allow_duplicates.get(),
+            trait_multi_unique=self.var_trait_multi_unique.get(),
+            trait_immunity_weight_x2=self.var_trait_immunity_weight_x2.get(),
+            limit_break_step_10=self.var_limit_break_step_10.get(),
+            merlin_auto_support=self.var_merlin_auto_support.get(),
             costume_packages_all=self.var_costume_packages_all.get(),
             recycle_six_star=self.var_recycle_six_star.get(),
             campaign_shop_discount=self.var_campaign_shop_discount.get(),

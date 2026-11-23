@@ -72,6 +72,7 @@ OTHER_COVAULT_HOOK_SITES = {
     "equipment_tier_upgrades": 0xAB3394,
     "guild_raid_fire_support": 0xAB335C,
     "guild_raid_protection_persist": 0xAB32F4,
+    "merlin_auto_support": 0xAB3300,
 }
 
 

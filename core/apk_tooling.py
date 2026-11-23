@@ -32,6 +32,7 @@ from core.core_patches import (
     DEV_OUTPUT_SUFFIX,
     LIMIT_BREAK_FIXED_GOLD,
     LIMIT_BREAK_FIXED_MATERIAL,
+    LIMIT_BREAK_MAX_LEVEL,
     RECYCLE_SIX_STAR_CLIENT_ASSETS,
     RECYCLE_SIX_STAR_GROUP_SLOT,
     RECYCLE_SIX_STAR_GROUPS,
@@ -46,6 +47,7 @@ from core.core_patches import (
     PatchOptions,
     PatchResult,
     apply_all_patches,
+    limit_break_step10_target,
     recycle_six_star_assignment,
 )
 from core.dex_smali import ResourceContract, ensure_apktool_jar
@@ -1155,6 +1157,45 @@ def inspect_limit_break_cost_assets(
     return profile, f"client table matches {profile} ({len(rows)} rows)"
 
 
+def _limit_break_step_profile_from_rows(
+    rows: list[dict[str, Any]],
+) -> tuple[str | None, str]:
+    """Returns ``('stock' | 'limit_break_step_10' | None, sha256_hex)`` for level steps."""
+    pairs = [(int(row["_levelBefore"]), int(row["_levelAfter"])) for row in rows]
+    digest = hashlib.sha256(repr(pairs).encode("ascii")).hexdigest()
+    if not pairs:
+        return None, digest
+    if not all(70 <= before < LIMIT_BREAK_MAX_LEVEL for before, _ in pairs):
+        return None, digest
+    if all(after == before + 2 for before, after in pairs):
+        return "stock", digest
+    if all(after == limit_break_step10_target(before) for before, after in pairs):
+        return "limit_break_step_10", digest
+    return None, digest
+
+
+def inspect_limit_break_step_assets(
+    archive: zipfile.ZipFile,
+) -> tuple[bool, str]:
+    """Checks whether limitbreakcost.unity3d uses +10 limit-break steps to Lv 120."""
+    rows, error = _read_datatable_rows(
+        archive,
+        LIMIT_BREAK_CLIENT_ASSET_PATH,
+        label="limitbreakcost.unity3d",
+    )
+    if rows is None:
+        return False, error or "limitbreakcost.unity3d unavailable"
+    try:
+        profile, digest = _limit_break_step_profile_from_rows(rows)
+    except (KeyError, TypeError, ValueError) as exc:
+        return False, f"limitbreakcost.unity3d missing level fields: {exc}"
+    if profile == "limit_break_step_10":
+        return True, f"client table uses +10 steps to Lv 120 ({len(rows)} rows)"
+    if profile == "stock":
+        return False, f"client table uses stock +2 steps ({len(rows)} rows)"
+    return False, f"Unknown limitbreakcost.unity3d level steps (sha {digest[:12]})"
+
+
 RUNE_UPGRADE_CLIENT_STOCK = {
     12: ((5188, 5707, 6278, 9414, 10986, 12555),
          (8500, 17000, 34000, 59500, 74800, 136000)),
@@ -1908,16 +1949,16 @@ def _patch_resources_zip_file(
 
             elif (
                 info.filename == "files/Resources/datatable/limitbreakcost.unity3d"
-                and (options.limit_break_cost_tenth or options.limit_break_cost_fixed)
+                and (
+                    options.limit_break_cost_tenth
+                    or options.limit_break_cost_fixed
+                    or options.limit_break_step_10
+                )
             ):
                 data = archive.read(info.filename)
                 try:
                     clear, k, v = _decrypt_datatable(data)
                     env = UnityPy.load(clear)
-                    target_profile = _limit_break_target_profile(options)
-                    divisor = limit_break_client_divisor(
-                        tenth=options.limit_break_cost_tenth,
-                    )
                     behaviours: list[tuple[Any, dict[str, Any]]] = []
                     all_rows: list[dict[str, Any]] = []
                     for obj in env.objects:
@@ -1928,56 +1969,108 @@ def _patch_resources_zip_file(
                         all_rows.extend(tree.get("_data") or [])
                     if not all_rows:
                         raise ValueError("limitbreakcost.unity3d has no rows")
-                    current_profile, digest = _limit_break_profile_from_rows(all_rows)
-                    fixed_target = target_profile == "limit_break_cost_fixed"
-                    upgradeable = {"stock"} | (
-                        {"limit_break_cost_tenth"} if fixed_target else set()
+
+                    wants_cost = bool(
+                        options.limit_break_cost_tenth or options.limit_break_cost_fixed
                     )
-                    if current_profile == target_profile:
+                    wants_step = bool(options.limit_break_step_10)
+                    needs_cost_patch = False
+                    needs_step_patch = False
+                    target_profile = ""
+                    fixed_target = False
+                    divisor = 1
+
+                    if wants_cost:
+                        target_profile = _limit_break_target_profile(options)
+                        divisor = limit_break_client_divisor(
+                            tenth=options.limit_break_cost_tenth,
+                        )
+                        current_profile, digest = _limit_break_profile_from_rows(all_rows)
+                        fixed_target = target_profile == "limit_break_cost_fixed"
+                        upgradeable = {"stock"} | (
+                            {"limit_break_cost_tenth"} if fixed_target else set()
+                        )
+                        if current_profile == target_profile:
+                            pass
+                        elif current_profile not in upgradeable:
+                            if current_profile is not None:
+                                raise ValueError(
+                                    f"limitbreakcost.unity3d already matches "
+                                    f"conflicting profile {current_profile!r} "
+                                    f"(expected 'stock' or {target_profile!r})"
+                                )
+                            raise ValueError(
+                                f"unexpected limitbreakcost.unity3d table "
+                                f"(sha {digest[:12]}; expected 'stock' or {target_profile!r})"
+                            )
+                        else:
+                            needs_cost_patch = True
+
+                    if wants_step:
+                        step_profile, step_digest = _limit_break_step_profile_from_rows(
+                            all_rows
+                        )
+                        if step_profile == "limit_break_step_10":
+                            pass
+                        elif step_profile == "stock":
+                            needs_step_patch = True
+                        else:
+                            raise ValueError(
+                                f"unexpected limitbreakcost.unity3d level steps "
+                                f"(sha {step_digest[:12]}; expected 'stock' or 'limit_break_step_10')"
+                            )
+
+                    if not needs_cost_patch and not needs_step_patch:
                         if log_fn:
+                            skip_label = target_profile or "limit_break_step_10"
                             log_fn(
                                 "Skipped limitbreakcost.unity3d: client table "
-                                f"already matches {target_profile}"
+                                f"already matches {skip_label}"
                             )
-                    elif current_profile not in upgradeable:
-                        if current_profile is not None:
-                            raise ValueError(
-                                f"limitbreakcost.unity3d already matches "
-                                f"conflicting profile {current_profile!r} "
-                                f"(expected 'stock' or {target_profile!r})"
-                            )
-                        raise ValueError(
-                            f"unexpected limitbreakcost.unity3d table "
-                            f"(sha {digest[:12]}; expected 'stock' or {target_profile!r})"
-                        )
                     else:
                         for obj, tree in behaviours:
                             for row in tree.get("_data") or []:
-                                if fixed_target:
-                                    row["_cost"] = LIMIT_BREAK_FIXED_GOLD
-                                    row["_rewardValue02"] = LIMIT_BREAK_FIXED_MATERIAL
-                                    continue
-                                cost = int(row.get("_cost", 0))
-                                if cost <= 0:
-                                    raise ValueError(
-                                        f"invalid limit break client cost: {cost}"
+                                if needs_cost_patch:
+                                    if fixed_target:
+                                        row["_cost"] = LIMIT_BREAK_FIXED_GOLD
+                                        row["_rewardValue02"] = LIMIT_BREAK_FIXED_MATERIAL
+                                    else:
+                                        cost = int(row.get("_cost", 0))
+                                        if cost <= 0:
+                                            raise ValueError(
+                                                f"invalid limit break client cost: {cost}"
+                                            )
+                                        row["_cost"] = cost // divisor
+                                        material = int(row.get("_rewardValue02", 0))
+                                        if material <= 0:
+                                            raise ValueError(
+                                                f"invalid limit break client material: {material}"
+                                            )
+                                        row["_rewardValue02"] = material // divisor
+                                if needs_step_patch:
+                                    level_before = int(row["_levelBefore"])
+                                    row["_levelAfter"] = limit_break_step10_target(
+                                        level_before
                                     )
-                                row["_cost"] = cost // divisor
-                                material = int(row.get("_rewardValue02", 0))
-                                if material <= 0:
-                                    raise ValueError(
-                                        f"invalid limit break client material: {material}"
-                                    )
-                                row["_rewardValue02"] = material // divisor
                             obj.save_typetree(tree)
-                        patched_profile, patched_digest = _limit_break_profile_from_rows(
-                            all_rows
-                        )
-                        if patched_profile != target_profile:
-                            raise ValueError(
-                                "patched limitbreakcost.unity3d hash mismatch: "
-                                f"{patched_digest[:12]} (expected {target_profile})"
+                        if needs_cost_patch:
+                            patched_profile, patched_digest = _limit_break_profile_from_rows(
+                                all_rows
                             )
+                            if patched_profile != target_profile:
+                                raise ValueError(
+                                    "patched limitbreakcost.unity3d hash mismatch: "
+                                    f"{patched_digest[:12]} (expected {target_profile})"
+                                )
+                        if needs_step_patch:
+                            patched_step, patched_step_digest = (
+                                _limit_break_step_profile_from_rows(all_rows)
+                            )
+                            if patched_step != "limit_break_step_10":
+                                raise ValueError(
+                                    "patched limitbreakcost.unity3d level-step mismatch: "
+                                    f"{patched_step_digest[:12]}"
+                                )
                         new_clear = bytes(getattr(env.file, "save")())  # noqa: B009
                         patched = _encrypt_datatable(new_clear, k, v)
                         if patched != data:
@@ -1985,7 +2078,7 @@ def _patch_resources_zip_file(
                         if log_fn:
                             log_fn(
                                 "Patched limitbreakcost.unity3d: client limit-break "
-                                "costs now match the server discount"
+                                "table updated to match server"
                             )
                 except Exception as exc:
                     failures.append(f"limitbreakcost.unity3d: {exc}")
@@ -2474,6 +2567,7 @@ def needs_resource_archive_patch(options: PatchOptions) -> bool:
         or options.alex_heros_mark
         or options.limit_break_cost_tenth
         or options.limit_break_cost_fixed
+        or options.limit_break_step_10
         or options.crystal_skill_90_off
         or options.recycle_six_star
         or options.sacred_lands_restore

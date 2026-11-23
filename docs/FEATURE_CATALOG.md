@@ -1,10 +1,10 @@
 # Grouped Feature Catalog
 
-This is the canonical index of GUI feature numbers for FWT Reborn Patch 2.5.50. The same IDs appear in the graphical interface. For code locations, byte sequences and validation history, see [PATCH_SPEC.md](PATCH_SPEC.md).
+This is the canonical index of GUI feature numbers for FWT Reborn Patch 2.5.58. The same IDs appear in the graphical interface. For code locations, byte sequences and validation history, see [PATCH_SPEC.md](PATCH_SPEC.md).
 
 IDs are stable references, not positions: never renumber or reuse an ID. If a feature moves to another group, keep its existing ID; its prefix identifies the group in which it was first assigned. Add new items with a new number in the relevant group and update `gui/feature_catalog.py` and this catalog together. The parity tests verify the mapping.
 
-`--all` enables the gameplay and localization options in groups 01–08 and 12, uses the 50/30/20 summon profile and rune factor 10, and keeps 16 KB alignment. LAN is selected separately. The 70/20/10 profile can replace the default by combining `--all --summon-rates`. For hero limit breaks, `--all` selects the flat cost (`06.09`) unless `--limit-break-cost-tenth` (`06.06`) is passed.
+`--all` enables the gameplay and localization options in groups 01–08 and 12–14, uses the 50/30/20 summon profile and rune factor 10, and keeps 16 KB alignment. LAN is selected separately. The 70/20/10 profile can replace the default by combining `--all --summon-rates`. For hero limit breaks, `--all` selects the flat cost (`06.09`) unless `--limit-break-cost-tenth` (`06.06`) is passed.
 
 ## 01 — Campaign, expeditions and modes
 
@@ -116,6 +116,7 @@ bonuses are still under investigation and are not yet guaranteed.
 | 08.05 | Allow non-reference APK | `--force` | `allow_unknown` | `var_force` | No |
 | 08.06 | Hero EXP cap and Limit Break floor | Always on | Built-in fix | None | Always |
 | 08.07 | Non-hex inventory sync guard (KB-001) | Always on | Built-in fix | None | Always |
+| 08.08 | Mercenary auto-select recommendations (`DUNGEON_RECOM_INFO`) | Always on | Built-in fix | None | Always |
 
 ## 12 — Original hero modifications
 
@@ -126,6 +127,22 @@ See the [Awakening guide](HERO_AWAKENING_GUIDE.md), [Skill rebalance guide](SKIL
 | 12.01 | Alex Awakening: Destiny Lance | `--alex-awakening` | `alex_awakening` | `var_alex_awakening` | Yes |
 | 12.02 | Alex Skill, Passive & Awake Rebalance (Skill 1 = Skill 2 geometry; Skill 2 reduces Defense) | `--alex-rebalance` | `alex_rebalance` | `var_alex_rebalance` | Yes |
 | 12.03 | Alex's Hero's Mark — The Unbroken Lance | `--alex-heros-mark` | `alex_heros_mark` | `var_alex_heros_mark` | Yes |
+
+## 13 — Heroes and traits
+
+| ID | Feature | CLI | PatchOptions field | GUI variable | `--all` |
+|---|---|---|---|---|---|
+| 13.01 | Traits: Max quality on every roll (always pink / grade 5) | `--trait-max-quality` | `trait_max_quality` | `var_trait_max_quality` | Yes |
+| 13.02 | Allow duplicate hero traits across slots | `--trait-allow-duplicates` | `trait_allow_duplicates` | `var_trait_allow_duplicates` | Yes |
+| 13.03 | Limit Break opens +10 levels per step (to Lv 120) | `--limit-break-step-10` | `limit_break_step_10` | `var_limit_break_step_10` | Yes |
+| 13.04 | Traits: Multi-roll batch never repeats attributes in one rolled list | `--trait-multi-unique` | `trait_multi_unique` | `var_trait_multi_unique` | Yes |
+| 13.05 | Traits: Double immunity weights (Slots 3-5) (20,000 vs 10,000 normal) | `--trait-immunity-weight-x2` | `trait_immunity_weight_x2` | `var_trait_immunity_weight_x2` | Yes |
+
+## 14 — Auto-battle AI
+
+| ID | Feature | CLI | PatchOptions field | GUI variable | `--all` |
+|---|---|---|---|---|---|
+| 14.01 | Merlin Slot-1 Auto Mode: Awake, then Magic infusion (strongest Awakening first), before bonus or item cells | `--merlin-auto-support` | `merlin_auto_support` | `var_merlin_auto_support` | Yes |
 
 ## Development options
 
@@ -169,5 +186,6 @@ Groups 09–11 are for development builds and are not enabled by `--all`. The de
 - **08.03:** the Coocoo box correction is unconditional and has no selectable flag.
 - **08.04:** offline mode is the default; LAN requires an explicit IP and optional port.
 - **08.05:** the advanced non-reference input override is in the APK selection card and is off by default.
+- **08.08:** the pre-battle mercenary auto-select fix is unconditional and has no selectable flag; the client's "auto select" finally receives a `recom_list` (served from the friends data) instead of the stock empty ack.
 - Development instrumentation is separate from release features; groups 09–11 and [DEV_BUILD.md](DEV_BUILD.md) distinguish implemented and pending options.
 - Removed gameplay features are historical only; they are not selectable and have no current IDs. Pending development controls remain labeled above.

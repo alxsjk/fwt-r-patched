@@ -41,6 +41,13 @@ from core.dex_smali import (
     ensure_apktool_jar,
     rebuild_dex,
 )
+from core.dungeon_recom_info import (
+    CAVE_SIZE as DUNGEON_RECOM_INFO_CAVE_SIZE,
+)
+from core.dungeon_recom_info import (
+    CAVE_VADDR as DUNGEON_RECOM_INFO_CAVE_VADDR,
+)
+from core.dungeon_recom_info import apply_dungeon_recom_info
 from core.elf_mapping import canonicalize_segments, project_segments
 from core.equipment_tier_upgrades import CAVES as EQUIPMENT_TIER_CAVES
 from core.equipment_tier_upgrades import apply_equipment_tiers
@@ -59,6 +66,25 @@ from core.guild_raid_protection_persist import (
 )
 from core.guild_raid_protection_persist import apply_guild_raid_protection_persist
 from core.hero_shop_offers import apply_hero_shop_offers
+from core.merlin_auto_support import (
+    CAVE_SIZE as MERLIN_AUTO_SUPPORT_CAVE_SIZE,
+)
+from core.merlin_auto_support import (
+    CAVE_VADDR as MERLIN_AUTO_SUPPORT_CAVE_VADDR,
+)
+from core.merlin_auto_support import (
+    PRIORITY_CAVE_SIZE as MERLIN_AUTO_SUPPORT_PRIORITY_CAVE_SIZE,
+)
+from core.merlin_auto_support import (
+    PRIORITY_CAVE_VADDR as MERLIN_AUTO_SUPPORT_PRIORITY_CAVE_VADDR,
+)
+from core.merlin_auto_support import (
+    TAIL_CAVE_SIZE as MERLIN_AUTO_SUPPORT_TAIL_CAVE_SIZE,
+)
+from core.merlin_auto_support import (
+    TAIL_CAVE_VADDR as MERLIN_AUTO_SUPPORT_TAIL_CAVE_VADDR,
+)
+from core.merlin_auto_support import apply_merlin_auto_support
 from core.mythical_shop import apply_mythical_shop
 from core.surprise_transcendence_package import apply_surprise_transcendence_package
 from core.version import APP_VERSION
@@ -889,6 +915,75 @@ RANDOPTION_FALLBACK_SITE = 0x9A2AAC
 RANDOPTION_FALLBACK_ORIGINAL = bytes.fromhex("00230054")  # b.eq 0x9A2F0C
 RANDOPTION_FALLBACK_REPLACEMENT = bytes.fromhex("18010014")  # b 0x9A2F0C
 
+# Server-side hero potential (Trait) tables (kFwtPotentialDataRows / kFwtPotentialGradeRows).
+# Each data row is 68 bytes: potential_id, potential_type, and 15 int32 weights
+# (5 slots x 3 phases).  Each grade row is 12 bytes: potential_id, grade (1..5),
+# and combat_power.
+POTENTIAL_DATA_TABLE_VADDR = 0x6CBBC8
+POTENTIAL_DATA_ROW_SIZE = 68
+POTENTIAL_DATA_ROW_COUNT = 393
+POTENTIAL_DATA_WEIGHT_OFFSET = 0x08
+POTENTIAL_DATA_WEIGHT_COUNT = 15
+POTENTIAL_GRADE_TABLE_VADDR = 0x6D242C
+POTENTIAL_GRADE_ROW_SIZE = 12
+POTENTIAL_TOP_QUALITY = 5
+# In choose_potential_code_json (0x8BFDF0), after splitting creature["potentials"],
+# the empty-vector guard ``b.eq 0x8C00F0`` skips constructing the cross-slot
+# excluded-types std::set.  Making that branch unconditional frees the vector
+# cleanly and leaves the exclusion set empty so any slot can roll repeated types
+# (e.g. multiple +Crit Rate slots) while keeping w4=1 current-slot exclusion intact.
+POTENTIAL_DEDUP_SITE = 0x8BFF74
+POTENTIAL_DEDUP_TARGET = 0x8C00F0
+POTENTIAL_DEDUP_ORIGINAL = bytes.fromhex("e00b0054")  # b.eq #0x8c00f0
+POTENTIAL_DEDUP_REPLACEMENT = bytes.fromhex("5f000014")  # b #0x8c00f0
+
+# Feature 13.04: Unique attributes within a multi-roll (10x) Trait change batch
+# (REQ_CHANGE_CREATURE_POTENTIAL loop 0x7FF69C..0x7FF904 -> choose_potential_code_json 0x8BFDF0).
+POTENTIAL_BATCH_INIT_SITE = 0x7FF69C
+POTENTIAL_BATCH_INIT_ORIGINAL = bytes.fromhex("38008052")  # mov w24, #1
+POTENTIAL_BATCH_CALL_SITE = 0x7FF7F4
+POTENTIAL_BATCH_CALL_ORIGINAL = bytes.fromhex("7f010394")  # bl #0x8bfdf0
+POTENTIAL_FLAGS_STORE_SITE = 0x8BFE30
+POTENTIAL_FLAGS_STORE_ORIGINAL = bytes.fromhex("e44300b9")  # str w4, [sp, #0x40]
+POTENTIAL_FLAGS_STORE_REPLACEMENT = bytes.fromhex("e42300f9")  # str x4, [sp, #0x40]
+POTENTIAL_PASS1_FILTER_SITE = 0x8C01E8
+POTENTIAL_PASS1_FILTER_ORIGINAL = bytes.fromhex("a8035ff8")  # ldur x8, [x29, #-0x10]
+POTENTIAL_PASS2_FILTER_SITE = 0x8C0524
+POTENTIAL_PASS2_FILTER_ORIGINAL = bytes.fromhex("a8835df8")  # ldur x8, [x29, #-0x28]
+POTENTIAL_PASS2_EMPTY_SITE = 0x8C07C8
+POTENTIAL_PASS2_EMPTY_ORIGINAL = bytes.fromhex("5f031ceb")  # cmp x26, x28
+
+POTENTIAL_MULTI_UNIQUE_CAVE_VADDR = 0xB2B530
+POTENTIAL_MULTI_UNIQUE_BATCH_INIT_VADDR = 0xB2B530
+POTENTIAL_MULTI_UNIQUE_BATCH_CALL_VADDR = 0xB2B53C
+POTENTIAL_MULTI_UNIQUE_PASS1_FILTER_VADDR = 0xB2B5A0
+POTENTIAL_MULTI_UNIQUE_PASS2_FILTER_VADDR = 0xB2B5CC
+POTENTIAL_MULTI_UNIQUE_PASS2_EMPTY_VADDR = 0xB2B5F8
+POTENTIAL_MULTI_UNIQUE_CAVE_BYTES = bytes.fromhex(
+    "38008052fb031faac0035fd6fd7bbfa964fb7fd3840040b22a52f6971f0000f1"
+    "4d02005409ddff9029212f912a3180528b0880d22c0140b99f01006ba0000054"
+    "29010b8b4a05007161ffff54070000142c0540b99ff90071880000542d0080d2"
+    "ad21cc9a7b030daafd7bc1a8c0035fd6e82340f908fd41d3c80000b4690640b9"
+    "3ff90071680000540825c99a68000037a8035ff80a53f617f852f617e82340f9"
+    "08fd41d3c80000b4a90640b93ff90071680000540825c99a68000037a8835df8"
+    "ce53f617bc53f6175f031cebe1000054e82340f909fd41d3a90000b408014092"
+    "e82300f9ad53f6176e54f617c255f617"
+)
+POTENTIAL_MULTI_UNIQUE_CAVE_SIZE = len(POTENTIAL_MULTI_UNIQUE_CAVE_BYTES)
+POTENTIAL_MULTI_UNIQUE_CAVE_ORIGINAL_SHA256 = (
+    "c382fe68af0ea2bf018f294e34594e004fe4166ce0bb2dd5fe38b1817b78fea9"
+)
+
+# Feature 13.05: Double immunity trait weights in Slots 3, 4, and 5
+# (20,000 vs 10,000 normal stats, up from stock 335).
+POTENTIAL_IMMUNITY_WEIGHT = 20000
+POTENTIAL_IMMUNITY_ROWS: tuple[tuple[int, int, int, int, int], ...] = (
+    # (row_index, potential_id, potential_type, column, original_weight)
+    (300, 35001, 35, 6, 335),
+    (301, 36001, 36, 12, 335),
+    (302, 37001, 37, 9, 335),
+)
+
 # Equipment gradeup success/fail tables (indexed by current enchant level).
 # Index 9 is the +9 -> +10 step: fail = 0 makes the deterministic roll return
 # success without changing +0..+8 or +10 -> +11.
@@ -1345,8 +1440,10 @@ BATTLE_ARENA_SAVE_CAVE_BYTES = bytes.fromhex(
 LIMIT_BREAK_GOLD_TABLE = 0x756CF0
 LIMIT_BREAK_GOLD_ROW_SIZE = 24
 LIMIT_BREAK_GOLD_ROWS = 45
+LIMIT_BREAK_AFTER_FIELD_OFFSET = 4
 LIMIT_BREAK_GOLD_FIELD_OFFSET = 20
 LIMIT_BREAK_MATERIAL_FIELD_OFFSET = 16
+LIMIT_BREAK_MAX_LEVEL = 120
 LIMIT_BREAK_GOLD_TABLE_ORIGINAL_SHA256 = (
     "d79fe5e1c89b5ec6494d684dffe68b217e1ecfd0464acb330ad32ec1247bd917"
 )
@@ -1368,6 +1465,71 @@ LIMIT_BREAK_FIXED_GOLD = 1_000_000
 LIMIT_BREAK_COST_FIXED_SHA256 = (
     "fd6ade417ed0d6ff086613bb2d1e32b548fd1fc1dea5d0f943a63f12044de411"
 )
+_LIMIT_BREAK_KNOWN_COST_DIGESTS = (
+    LIMIT_BREAK_GOLD_TABLE_ORIGINAL_SHA256,
+    LIMIT_BREAK_GOLD_TABLE_PATCHED_SHA256,
+    LIMIT_BREAK_COST_TABLE_PATCHED_SHA256,
+    LIMIT_BREAK_COST_TENTH_SHA256,
+    LIMIT_BREAK_COST_FIXED_SHA256,
+)
+
+
+def limit_break_step10_target(level_before: int) -> int:
+    """Return the 10-level milestone cap for ``level_before`` (up to 120)."""
+    return min(LIMIT_BREAK_MAX_LEVEL, ((level_before // 10) + 1) * 10)
+
+
+def inspect_limit_break_table(table_bytes: bytes) -> tuple[str, str]:
+    """Return ``(normalized_cost_sha256, step_mode)`` for ``kFwtCreatureLimitBreakCosts``.
+
+    ``step_mode`` is ``"stock"`` when every row advances by +2, ``"step_10"`` when
+    every row jumps to the next 10-level milestone up to 120, or ``"unknown"`` on a
+    mixed or unrecognized ladder.  ``normalized_cost_sha256`` always normalizes valid
+    ``+10`` ``level_after`` values back to stock ``level_before + 2`` so cost profiles
+    are identified identically whether or not ``limit_break_step_10`` is applied.
+    """
+    expected_size = LIMIT_BREAK_GOLD_ROW_SIZE * LIMIT_BREAK_GOLD_ROWS
+    if len(table_bytes) != expected_size:
+        raise ValueError(
+            f"Expected {expected_size} bytes for kFwtCreatureLimitBreakCosts, "
+            f"got {len(table_bytes)}"
+        )
+    normalized = bytearray(table_bytes)
+    all_stock = True
+    all_step10 = True
+    for index in range(LIMIT_BREAK_GOLD_ROWS):
+        row_offset = index * LIMIT_BREAK_GOLD_ROW_SIZE
+        level_before, level_after = struct.unpack_from("<2i", table_bytes, row_offset)
+        stock_after = level_before + 2
+        step10_after = limit_break_step10_target(level_before)
+        if level_after != stock_after:
+            all_stock = False
+            struct.pack_into(
+                "<i", normalized, row_offset + LIMIT_BREAK_AFTER_FIELD_OFFSET, stock_after
+            )
+        if level_after != step10_after:
+            all_step10 = False
+        if level_after not in (stock_after, step10_after):
+            return hashlib.sha256(table_bytes).hexdigest(), "unknown"
+    if all_stock and not all_step10:
+        return hashlib.sha256(table_bytes).hexdigest(), "stock"
+    if all_step10 and not all_stock:
+        return hashlib.sha256(bytes(normalized)).hexdigest(), "step_10"
+    return hashlib.sha256(table_bytes).hexdigest(), "unknown"
+
+
+def limit_break_step10_state(buf: bytes | bytearray) -> tuple[bool, str]:
+    """Return ``(active, detail)`` for the server limit-break +10 level progression."""
+    table_size = LIMIT_BREAK_GOLD_ROW_SIZE * LIMIT_BREAK_GOLD_ROWS
+    table_bytes = bytes(buf[LIMIT_BREAK_GOLD_TABLE:LIMIT_BREAK_GOLD_TABLE + table_size])
+    cost_digest, step_mode = inspect_limit_break_table(table_bytes)
+    if cost_digest not in _LIMIT_BREAK_KNOWN_COST_DIGESTS:
+        return False, f"unexpected table sha {cost_digest[:12]}"
+    if step_mode == "step_10":
+        return True, f"table 0x{LIMIT_BREAK_GOLD_TABLE:x}, {LIMIT_BREAK_GOLD_ROWS} rows (+10 to Lv120)"
+    if step_mode == "stock":
+        return False, f"table 0x{LIMIT_BREAK_GOLD_TABLE:x} uses stock +2 level steps"
+    return False, f"mixed or unknown level steps at 0x{LIMIT_BREAK_GOLD_TABLE:x}"
 
 # ---------------------------------------------------------------------------
 # High-level infinite transcendence success
@@ -1881,11 +2043,18 @@ EXPECTED_PATCH_COUNTS = {
     "equipment_upgrade_10_guarantee": 1,
     "limit_break_cost_tenth": LIMIT_BREAK_GOLD_ROWS,
     "limit_break_cost_fixed": LIMIT_BREAK_GOLD_ROWS,
+    "limit_break_step_10": LIMIT_BREAK_GOLD_ROWS,
     "soulgear_enchant_always": 1,
     "no_win_box": 2,
     "hero_exp_cap": 4,
     "convert_hex_guard": 2,
+    "dungeon_recom_info": 2,
+    "merlin_auto_support": 4,
     "rune_option_quality": 1,
+    "trait_max_quality": 130,
+    "trait_allow_duplicates": 1,
+    "trait_multi_unique": 7,
+    "trait_immunity_weight_x2": 3,
     "lan_redirect": 1,
 }
 
@@ -1896,6 +2065,10 @@ IDEMPOTENT_PATCHES: frozenset[str] = frozenset({
     "summon_rates",
     "summon_rates_50_30_20",
     "option_max_attributes",
+    "trait_max_quality",
+    "trait_allow_duplicates",
+    "trait_multi_unique",
+    "trait_immunity_weight_x2",
     "rune_box_random_type",
     "rune_quality_factor",
     "rune_box_random_roll",
@@ -1905,12 +2078,15 @@ IDEMPOTENT_PATCHES: frozenset[str] = frozenset({
     "equipment_upgrade_10_guarantee",
     "limit_break_cost_tenth",
     "limit_break_cost_fixed",
+    "limit_break_step_10",
     "soulgear_enchant_always",
     "rune_upgrade_discount",
     "gold_cylinder_fix",
     "no_win_box",
     "hero_exp_cap",
     "convert_hex_guard",
+    "dungeon_recom_info",
+    "merlin_auto_support",
     "rune_option_quality",
     "expedition_bonus",
     "gene_priority",
@@ -2154,6 +2330,7 @@ class PatchOptions:
     equipment_upgrade_10_guarantee: bool = False  # +9 -> +10 upgrade always succeeds
     limit_break_cost_tenth: bool = False  # creature transcend costs 90% less
     limit_break_cost_fixed: bool = False  # every hero limit break costs 1M gold + 100 jade
+    limit_break_step_10: bool = False     # limit break opens +10 levels per step (up to Lv120)
     soulgear_enchant_always: bool = False  # gold-paid soulgear enchant always works
     rune_option_quality: bool = False    # rune rolls use the maximum mastery bonus
     rune_upgrade_discount: bool = False  # +12..+15 always succeed and cost a tenth
@@ -2188,6 +2365,11 @@ class PatchOptions:
     guild_raid_boss_no_counter: bool = False  # Zero Guild Raid boss counter rate (0%)
     guild_raid_protection_persist: bool = False  # Absolute Protection DR covers all hits until expiry
     alex_heros_mark: bool = False  # Alex's Hero's Mark "The Unbroken Lance" (12.03)
+    trait_max_quality: bool = False  # hero trait rolls always land on top quality (grade 5)
+    trait_allow_duplicates: bool = False  # allow repeating the same trait type across slots
+    trait_multi_unique: bool = False  # multi-roll trait batches never repeat attribute types
+    trait_immunity_weight_x2: bool = False  # double slot 3..5 immunity trait weights (20000)
+    merlin_auto_support: bool = False  # Merlin Slot-1 Auto Mode casts Magic infusion on Awake CD==1 ally
     lan_redirect: bool = False       # Redirect loopback to LAN server
     server_ip: str = "127.0.0.1"     # Target LAN IP (if lan_redirect enabled)
     server_port: int = 8010          # Target LAN port (if lan_redirect enabled)
@@ -3604,6 +3786,31 @@ def validate_cave_layout() -> None:
         "convert_hex_guard",
         CONVERT_HEX_GUARD_CAVE_VADDR,
         CONVERT_HEX_GUARD_CAVE_VADDR + CONVERT_HEX_GUARD_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "merlin_auto_support",
+        MERLIN_AUTO_SUPPORT_CAVE_VADDR,
+        MERLIN_AUTO_SUPPORT_CAVE_VADDR + MERLIN_AUTO_SUPPORT_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "merlin_auto_support_tail",
+        MERLIN_AUTO_SUPPORT_TAIL_CAVE_VADDR,
+        MERLIN_AUTO_SUPPORT_TAIL_CAVE_VADDR + MERLIN_AUTO_SUPPORT_TAIL_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "merlin_auto_support_priority",
+        MERLIN_AUTO_SUPPORT_PRIORITY_CAVE_VADDR,
+        MERLIN_AUTO_SUPPORT_PRIORITY_CAVE_VADDR + MERLIN_AUTO_SUPPORT_PRIORITY_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "dungeon_recom_info",
+        DUNGEON_RECOM_INFO_CAVE_VADDR,
+        DUNGEON_RECOM_INFO_CAVE_VADDR + DUNGEON_RECOM_INFO_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "trait_multi_unique",
+        POTENTIAL_MULTI_UNIQUE_CAVE_VADDR,
+        POTENTIAL_MULTI_UNIQUE_CAVE_VADDR + POTENTIAL_MULTI_UNIQUE_CAVE_SIZE,
     ))
 
     # The 0xB33634 client-patcher slot is shared between two mutually-exclusive
@@ -5431,7 +5638,12 @@ def apply_limit_break_cost_tenth(buf: bytearray) -> int:
     table_offset = LIMIT_BREAK_GOLD_TABLE
     table_size = LIMIT_BREAK_GOLD_ROW_SIZE * LIMIT_BREAK_GOLD_ROWS
     current = bytes(buf[table_offset:table_offset + table_size])
-    digest = hashlib.sha256(current).hexdigest()
+    digest, step_mode = inspect_limit_break_table(current)
+    if step_mode == "unknown":
+        raise ValueError(
+            f"Unexpected limit break cost table at 0x{LIMIT_BREAK_GOLD_TABLE:x}: "
+            f"sha256={digest} (the tenth patch only applies to the stock table)"
+        )
     if digest == LIMIT_BREAK_COST_TENTH_SHA256:
         return 0
     if digest == LIMIT_BREAK_COST_FIXED_SHA256:
@@ -5478,7 +5690,12 @@ def apply_limit_break_cost_fixed(buf: bytearray) -> int:
     table_offset = LIMIT_BREAK_GOLD_TABLE
     table_size = LIMIT_BREAK_GOLD_ROW_SIZE * LIMIT_BREAK_GOLD_ROWS
     current = bytes(buf[table_offset:table_offset + table_size])
-    digest = hashlib.sha256(current).hexdigest()
+    digest, step_mode = inspect_limit_break_table(current)
+    if step_mode == "unknown":
+        raise ValueError(
+            f"Unexpected limit break cost table at 0x{LIMIT_BREAK_GOLD_TABLE:x}: "
+            f"sha256={digest}"
+        )
     if digest == LIMIT_BREAK_COST_FIXED_SHA256:
         return 0
     if digest not in (
@@ -5507,10 +5724,43 @@ def apply_limit_break_cost_fixed(buf: bytearray) -> int:
             "<i", buf, row_offset + LIMIT_BREAK_GOLD_FIELD_OFFSET, LIMIT_BREAK_FIXED_GOLD
         )
         changed += 1
-    if hashlib.sha256(bytes(buf[table_offset:table_offset + table_size])).hexdigest() != (
-        LIMIT_BREAK_COST_FIXED_SHA256
-    ):
+    post_digest, _ = inspect_limit_break_table(
+        bytes(buf[table_offset:table_offset + table_size])
+    )
+    if post_digest != LIMIT_BREAK_COST_FIXED_SHA256:
         raise ValueError("Limit break table differs from the verified flat profile")
+    return changed
+
+
+def apply_limit_break_step_10(buf: bytearray) -> int:
+    """Opens +10 levels per hero limit break up to Lv 120 (70->80->90->100->110->120).
+
+    Updates the ``level_after`` column (+4) in all 45 rows of
+    ``kFwtCreatureLimitBreakCosts`` so any hero at level ``level_before`` advances to
+    ``min(120, ((level_before // 10) + 1) * 10)``.  Orthogonal to any gold/material
+    cost profile and idempotent across repeated invocations.
+    """
+    table_offset = LIMIT_BREAK_GOLD_TABLE
+    table_size = LIMIT_BREAK_GOLD_ROW_SIZE * LIMIT_BREAK_GOLD_ROWS
+    current = bytes(buf[table_offset:table_offset + table_size])
+    digest, step_mode = inspect_limit_break_table(current)
+    if step_mode == "unknown" or digest not in _LIMIT_BREAK_KNOWN_COST_DIGESTS:
+        raise ValueError(
+            f"Unexpected limit break cost table at 0x{LIMIT_BREAK_GOLD_TABLE:x}: "
+            f"sha256={digest}, step_mode={step_mode}"
+        )
+    if step_mode == "step_10":
+        return 0
+
+    changed = 0
+    for index in range(LIMIT_BREAK_GOLD_ROWS):
+        row_offset = table_offset + index * LIMIT_BREAK_GOLD_ROW_SIZE
+        level_before = struct.unpack_from("<i", buf, row_offset)[0]
+        target_after = limit_break_step10_target(level_before)
+        struct.pack_into(
+            "<i", buf, row_offset + LIMIT_BREAK_AFTER_FIELD_OFFSET, target_after
+        )
+        changed += 1
     return changed
 
 
@@ -5681,6 +5931,47 @@ def _randoption_rows(
     return rows
 
 
+def _top_quality_weight_plan(
+    rows: list[tuple[int, int, int, tuple[int, ...], int]],
+) -> tuple[dict[int, tuple[int, ...]], int]:
+    """Computes weight rewrites concentrating each ``(pool_key, column)`` pool on its top quality."""
+    pools: dict[tuple[int, int], list[tuple[int, int, int]]] = {}
+    for index, _row_id, pool_key, weights, quality in rows:
+        for column, weight in enumerate(weights):
+            if weight > 0:
+                pools.setdefault((pool_key, column), []).append(
+                    (index, weight, quality)
+                )
+    weights_by_index = {index: list(weights) for index, _i, _k, weights, _q in rows}
+    for (_pool_key, column), members in sorted(pools.items()):
+        total = sum(weight for _index, weight, _quality in members)
+        best = max(quality for _index, _weight, quality in members)
+        winners = [
+            (index, weight) for index, weight, quality in members if quality == best
+        ]
+        for index, _weight, _quality in members:
+            weights_by_index[index][column] = 0
+        if len(winners) == 1:
+            weights_by_index[winners[0][0]][column] = total
+            continue
+        winner_total = sum(weight for _index, weight in winners)
+        assigned = 0
+        for position, (index, weight) in enumerate(winners):
+            share = (
+                total - assigned
+                if position == len(winners) - 1
+                else total * weight // winner_total
+            )
+            assigned += share
+            weights_by_index[index][column] = share
+    plan = {
+        index: tuple(weights_by_index[index])
+        for index, _row_id, _pool_key, weights, _quality in rows
+        if tuple(weights_by_index[index]) != weights
+    }
+    return plan, len(pools)
+
+
 def randoption_top_quality_state(
     buf: bytes | bytearray,
 ) -> tuple[dict[int, tuple[int, ...]], int]:
@@ -5693,36 +5984,7 @@ def randoption_top_quality_state(
     attribute keeps the odds it had before and only the value inside the attribute
     changes.
     """
-    rows = _randoption_rows(buf)
-    pools: dict[tuple[int, int], list[tuple[int, int, int]]] = {}
-    for _index, _option_id, pool_key, weights, quality in rows:
-        for column, weight in enumerate(weights):
-            if weight > 0:
-                pools.setdefault((pool_key, column), []).append(
-                    (_index, weight, quality)
-                )
-    weights_by_index = {index: list(weights) for index, _i, _k, weights, _q in rows}
-    for (_pool_key, column), members in sorted(pools.items()):
-        total = sum(weight for _index, weight, _quality in members)
-        best = max(quality for _index, _weight, quality in members)
-        winners = [(index, weight) for index, weight, quality in members if quality == best]
-        for index, _weight, _quality in members:
-            weights_by_index[index][column] = 0
-        if len(winners) == 1:
-            weights_by_index[winners[0][0]][column] = total
-            continue
-        winner_total = sum(weight for _index, weight in winners)
-        assigned = 0
-        for position, (index, weight) in enumerate(winners):
-            share = total - assigned if position == len(winners) - 1 else total * weight // winner_total
-            assigned += share
-            weights_by_index[index][column] = share
-    plan = {
-        index: tuple(weights_by_index[index])
-        for index, _option_id, _pool_key, weights, _quality in rows
-        if tuple(weights_by_index[index]) != weights
-    }
-    return plan, len(pools)
+    return _top_quality_weight_plan(_randoption_rows(buf))
 
 
 def apply_option_max_attributes(buf: bytearray) -> int:
@@ -5753,6 +6015,236 @@ def apply_option_max_attributes(buf: bytearray) -> int:
             "randoption top quality weights",
         )
     return len(plan)
+
+
+def _potential_rows(
+    buf: bytes | bytearray,
+) -> list[tuple[int, int, int, tuple[int, ...], int]]:
+    """Reads and validates the hero potential (Trait) data and grade tables."""
+    table_offset = seg_offset(POTENTIAL_DATA_TABLE_VADDR)
+    grade_offset = seg_offset(POTENTIAL_GRADE_TABLE_VADDR)
+    rows: list[tuple[int, int, int, tuple[int, ...], int]] = []
+    for index in range(POTENTIAL_DATA_ROW_COUNT):
+        base = table_offset + index * POTENTIAL_DATA_ROW_SIZE
+        potential_id, potential_type = struct.unpack_from("<2i", buf, base)
+        weights = struct.unpack_from(
+            f"<{POTENTIAL_DATA_WEIGHT_COUNT}i",
+            buf,
+            base + POTENTIAL_DATA_WEIGHT_OFFSET,
+        )
+        grade_id, grade, _combat_power = struct.unpack_from(
+            "<3i", buf, grade_offset + index * POTENTIAL_GRADE_ROW_SIZE
+        )
+        if grade_id != potential_id:
+            raise ValueError(
+                f"potential grade row {index} names id {grade_id}, "
+                f"expected {potential_id}"
+            )
+        if not 1 <= grade <= POTENTIAL_TOP_QUALITY:
+            raise ValueError(
+                f"potential grade {grade} for id {potential_id} is out of range"
+            )
+        if any(weight < 0 for weight in weights):
+            raise ValueError(
+                f"potential weights for id {potential_id} are negative"
+            )
+        rows.append((index, potential_id, potential_type, weights, grade))
+    return rows
+
+
+def potential_top_quality_state(
+    buf: bytes | bytearray,
+) -> tuple[dict[int, tuple[int, ...]], int]:
+    """Returns pending weight changes and the count of weighted potential pools.
+
+    Each pool is one ``(potential_type, slot_phase_column)`` pair with positive
+    total weight.  The winning highest-grade row(s) receive the pool's entire
+    weight while lower-grade rows are zeroed, preserving every attribute's
+    original roll probability.
+    """
+    return _top_quality_weight_plan(_potential_rows(buf))
+
+
+def apply_trait_max_quality(buf: bytearray) -> int:
+    """Makes every hero Trait roll use its pool's top-quality (grade 5) row."""
+    plan, _pools = potential_top_quality_state(buf)
+    if not plan:
+        return 0
+    table_offset = seg_offset(POTENTIAL_DATA_TABLE_VADDR)
+    for index, weights in plan.items():
+        offset = (
+            table_offset
+            + index * POTENTIAL_DATA_ROW_SIZE
+            + POTENTIAL_DATA_WEIGHT_OFFSET
+        )
+        _write_bytes(
+            buf,
+            offset,
+            struct.pack(f"<{POTENTIAL_DATA_WEIGHT_COUNT}i", *weights),
+            "potential top quality weights",
+        )
+    return len(plan)
+
+
+def apply_trait_allow_duplicates(buf: bytearray) -> int:
+    """Allows rolling trait types already saved in other slots of the hero."""
+    if (
+        encode_arm64_branch(POTENTIAL_DEDUP_SITE, POTENTIAL_DEDUP_TARGET)
+        != POTENTIAL_DEDUP_REPLACEMENT
+    ):
+        raise ValueError("Invalid potential dedup branch encoding")
+    return _apply_single_site(
+        buf,
+        POTENTIAL_DEDUP_SITE,
+        POTENTIAL_DEDUP_ORIGINAL,
+        POTENTIAL_DEDUP_REPLACEMENT,
+        "trait allow duplicates",
+    )
+
+
+def potential_multi_unique_sites() -> tuple[tuple[str, int, bytes, bytes], ...]:
+    """Returns ``(label, vaddr, original_bytes, replacement_bytes)`` for ``trait_multi_unique``."""
+    return (
+        (
+            "trait batch init",
+            POTENTIAL_BATCH_INIT_SITE,
+            POTENTIAL_BATCH_INIT_ORIGINAL,
+            encode_arm64_branch(
+                POTENTIAL_BATCH_INIT_SITE,
+                POTENTIAL_MULTI_UNIQUE_BATCH_INIT_VADDR,
+                link=True,
+            ),
+        ),
+        (
+            "trait batch call",
+            POTENTIAL_BATCH_CALL_SITE,
+            POTENTIAL_BATCH_CALL_ORIGINAL,
+            encode_arm64_branch(
+                POTENTIAL_BATCH_CALL_SITE,
+                POTENTIAL_MULTI_UNIQUE_BATCH_CALL_VADDR,
+                link=True,
+            ),
+        ),
+        (
+            "trait flags store",
+            POTENTIAL_FLAGS_STORE_SITE,
+            POTENTIAL_FLAGS_STORE_ORIGINAL,
+            POTENTIAL_FLAGS_STORE_REPLACEMENT,
+        ),
+        (
+            "trait pass1 filter",
+            POTENTIAL_PASS1_FILTER_SITE,
+            POTENTIAL_PASS1_FILTER_ORIGINAL,
+            encode_arm64_branch(
+                POTENTIAL_PASS1_FILTER_SITE,
+                POTENTIAL_MULTI_UNIQUE_PASS1_FILTER_VADDR,
+            ),
+        ),
+        (
+            "trait pass2 filter",
+            POTENTIAL_PASS2_FILTER_SITE,
+            POTENTIAL_PASS2_FILTER_ORIGINAL,
+            encode_arm64_branch(
+                POTENTIAL_PASS2_FILTER_SITE,
+                POTENTIAL_MULTI_UNIQUE_PASS2_FILTER_VADDR,
+            ),
+        ),
+        (
+            "trait pass2 empty",
+            POTENTIAL_PASS2_EMPTY_SITE,
+            POTENTIAL_PASS2_EMPTY_ORIGINAL,
+            encode_arm64_branch(
+                POTENTIAL_PASS2_EMPTY_SITE,
+                POTENTIAL_MULTI_UNIQUE_PASS2_EMPTY_VADDR,
+            ),
+        ),
+    )
+
+
+def apply_trait_multi_unique(buf: bytearray) -> int:
+    """Prevents multi-roll Trait batches from repeating attribute types within a batch."""
+    sites = potential_multi_unique_sites()
+    # Validate all six hook instructions and the cave slice before mutating so broken inputs never partially patch.
+    for label, site, original, replacement in sites:
+        off = seg_offset(site)
+        current = bytes(buf[off : off + len(replacement)])
+        if current not in (original, replacement):
+            raise ValueError(
+                f"Unexpected instruction at {label} site 0x{site:x}: "
+                f"{current.hex()} (expected {original.hex()} or {replacement.hex()})"
+            )
+
+    cave_off = seg_offset(POTENTIAL_MULTI_UNIQUE_CAVE_VADDR)
+    current_cave = bytes(buf[cave_off : cave_off + POTENTIAL_MULTI_UNIQUE_CAVE_SIZE])
+    cave_digest = hashlib.sha256(current_cave).hexdigest()
+    if (
+        current_cave != POTENTIAL_MULTI_UNIQUE_CAVE_BYTES
+        and cave_digest != POTENTIAL_MULTI_UNIQUE_CAVE_ORIGINAL_SHA256
+    ):
+        raise ValueError(
+            f"Unexpected trait multi unique cave at 0x{POTENTIAL_MULTI_UNIQUE_CAVE_VADDR:x}: "
+            f"sha256={cave_digest}"
+        )
+
+    changed = 0
+    if current_cave != POTENTIAL_MULTI_UNIQUE_CAVE_BYTES:
+        _write_bytes(buf, cave_off, POTENTIAL_MULTI_UNIQUE_CAVE_BYTES, "trait multi unique cave")
+        changed += 1
+
+    for label, site, original, replacement in sites:
+        changed += _apply_single_site(buf, site, original, replacement, label)
+    return changed
+
+
+def potential_immunity_weight_state(so_bytes: bytes) -> tuple[int, int, int]:
+    """Counts ``(patched, original, total)`` Slot 3..5 immunity rows."""
+    data_off = seg_offset(POTENTIAL_DATA_TABLE_VADDR)
+    patched = 0
+    original = 0
+    for row_idx, expected_pid, expected_ptype, col, orig_weight in POTENTIAL_IMMUNITY_ROWS:
+        row_off = data_off + row_idx * POTENTIAL_DATA_ROW_SIZE
+        pid, ptype = struct.unpack_from("<2i", so_bytes, row_off)
+        if (pid, ptype) != (expected_pid, expected_ptype):
+            raise ValueError(
+                f"Unexpected potential immunity row {row_idx}: "
+                f"id={pid} type={ptype} (expected {expected_pid}, {expected_ptype})"
+            )
+        weight_off = row_off + POTENTIAL_DATA_WEIGHT_OFFSET + col * 4
+        weight = struct.unpack_from("<i", so_bytes, weight_off)[0]
+        if weight == POTENTIAL_IMMUNITY_WEIGHT:
+            patched += 1
+        elif weight == orig_weight:
+            original += 1
+        else:
+            raise ValueError(
+                f"Unexpected immunity weight at row {row_idx} col {col}: "
+                f"{weight} (expected {orig_weight} or {POTENTIAL_IMMUNITY_WEIGHT})"
+            )
+    return patched, original, len(POTENTIAL_IMMUNITY_ROWS)
+
+
+def apply_trait_immunity_weight_x2(buf: bytearray) -> int:
+    """Doubles Slot 3..5 immunity trait weights relative to normal stats (335 -> 20,000)."""
+    potential_immunity_weight_state(bytes(buf))
+    data_off = seg_offset(POTENTIAL_DATA_TABLE_VADDR)
+    changed = 0
+    for row_idx, _pid, _ptype, col, _orig in POTENTIAL_IMMUNITY_ROWS:
+        weight_off = (
+            data_off
+            + row_idx * POTENTIAL_DATA_ROW_SIZE
+            + POTENTIAL_DATA_WEIGHT_OFFSET
+            + col * 4
+        )
+        current = struct.unpack_from("<i", buf, weight_off)[0]
+        if current != POTENTIAL_IMMUNITY_WEIGHT:
+            _write_bytes(
+                buf,
+                weight_off,
+                struct.pack("<i", POTENTIAL_IMMUNITY_WEIGHT),
+                "potential immunity weight",
+            )
+            changed += 1
+    return changed
 
 
 def apply_rune_option_max_quality(buf: bytearray) -> int:
@@ -7201,6 +7693,8 @@ def apply_all_patches(
         record("limit_break_cost_tenth", apply_limit_break_cost_tenth(so_buf))
     if options.limit_break_cost_fixed:
         record("limit_break_cost_fixed", apply_limit_break_cost_fixed(so_buf))
+    if options.limit_break_step_10:
+        record("limit_break_step_10", apply_limit_break_step_10(so_buf))
     if options.soulgear_enchant_always:
         record("soulgear_enchant_always", apply_soulgear_enchant_always(so_buf))
     if options.rune_option_quality:
@@ -7219,6 +7713,10 @@ def apply_all_patches(
     # UtilFunc$$ConvertHexU32 instead of throwing FormatException and aborting
     # OnGetMyItemInfo before later items (e.g. Mythical Stones) are loaded.
     record("convert_hex_guard", apply_convert_hex_guard(so_buf, seg_offset))
+    # Bug fix, not an option: the embedded server never implements
+    # DUNGEON_RECOM_INFO, so the pre-battle mercenary auto-select has no
+    # candidate list; answer it with the friend array the manual list uses.
+    record("dungeon_recom_info", apply_dungeon_recom_info(so_buf, seg_offset))
 
     if options.gold_cylinder_x10:
         record("gold_cylinder_x10", apply_gold_cylinder_x10(so_buf))
@@ -7249,6 +7747,24 @@ def apply_all_patches(
             "alex_heros_mark",
             apply_alex_heros_mark_so(so_buf, seg_offset),
         )
+
+    if options.merlin_auto_support:
+        record(
+            "merlin_auto_support",
+            apply_merlin_auto_support(so_buf, seg_offset),
+        )
+
+    if options.trait_max_quality:
+        record("trait_max_quality", apply_trait_max_quality(so_buf))
+
+    if options.trait_allow_duplicates:
+        record("trait_allow_duplicates", apply_trait_allow_duplicates(so_buf))
+
+    if options.trait_multi_unique:
+        record("trait_multi_unique", apply_trait_multi_unique(so_buf))
+
+    if options.trait_immunity_weight_x2:
+        record("trait_immunity_weight_x2", apply_trait_immunity_weight_x2(so_buf))
 
     if options.single_black_hammer:
         record("single_black_hammer", apply_single_black_hammer(so_buf))

@@ -49,7 +49,7 @@ Project-specific skills complement Spec Kit (keep all edits outside the Spec Kit
 - `fwt_patcher.py`: CLI entry point (`fwt-patcher`).
 - `tools/`: Reverse-engineering helpers, ELF/code-cave generators, `.env` cipher extractor (`extract_env_keys.py`), ADB probes, and release packagers (`create_distribution_zip.py`, `register_release.py`).
 - `tests/`: Unit, Keystone/Capstone/Unicorn emulation, GUI parity, inspector, GitHub workflow policy (`test_github_workflows.py`), and APK-backed `integration` tests.
-- `docs/`: Feature index (`FEATURE_CATALOG.md`) and technical reference docs (`PATCH_SPEC.md`, `CODE_CAVES.md`, `DEV_BUILD.md`, `GUILD_RAID_SELF_MERCENARY.md`, `HERO_AWAKENING_GUIDE.md`, `SKILL_REBALANCE_GUIDE.md`, `SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md`).
+- `docs/`: Feature index (`FEATURE_CATALOG.md`) and technical reference docs (`PATCH_SPEC.md`, `CODE_CAVES.md`, `DEV_BUILD.md`, `AUTO_MODE_AI_GUIDE.md`, `GUILD_RAID_SELF_MERCENARY.md`, `HERO_AWAKENING_GUIDE.md`, `SKILL_REBALANCE_GUIDE.md`, `SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md`).
 - `scripts/`: Toolchain setup (`setup-linux-toolchain.sh`).
 - `.github/`: CI matrix workflow (`ci.yml`), `CODEOWNERS`, issue/PR templates, and authorial PR/issue governance workflows (`pr-policy.yml`, `pr-policy-comment.yml`, `issue-triage.yml`).
 
@@ -136,10 +136,27 @@ Before changing development build instrumentation:
 - Never commit copyrighted binaries (`source/`, `*.apk`, `*.so`, `*.dex`, `*.dat`), user saves (`backups/`), signing keystores (`keystore/`), secrets (`.env`, `*.local.json`), build outputs (`output/`), coverage files (`.coverage`), or local editor/harness directories (`.commandcode/`).
 - Do not manually edit generated files under `.specify/scripts/`, `.specify/templates/`, or `.agents/skills/speckit-*` unless overriding intentionally via Spec Kit presets/extensions (checksums are tracked in `.specify/integrations/*.manifest.json`).
 
-## APK Builds
+## Release Builds & Documentation
 
-Always pass `--all` when generating APK builds for the user so each build
-includes the full default feature set.
+- Always pass `--all` when generating APK builds for the user so each build
+  includes the full default feature set.
+- For every new release build (both the patched APK and the distribution patch
+  ZIP produced via `tools/create_distribution_zip.py`), update `CHANGELOG.md`
+  (plus `core/version.py` / `pyproject.toml` / `README.md` version references
+  when bumping the version), all affected reference docs
+  (`docs/FEATURE_CATALOG.md`, `docs/PATCH_SPEC.md`, `docs/CODE_CAVES.md`, etc.),
+  and register the release APK in `output/releases.json` / `output/RELEASES.md`
+  via `tools/register_release.py`. Clean temporary RE dumps (`output/*.asm`,
+  `output/*.txt`, unpacked temp directories) and superseded build artifacts
+  from `output/` once packaging finishes.
+- Document novel reverse-engineering discoveries and unprecedented patch
+  mechanisms (such as `docs/HERO_AWAKENING_GUIDE.md`,
+  `docs/SKILL_REBALANCE_GUIDE.md`, `docs/GUILD_RAID_SELF_MERCENARY.md`, or
+  `docs/AUTO_MODE_AI_GUIDE.md`) in a dedicated specification/guide under `docs/`
+  for future reference before or alongside releasing them.
+- After completing a new release build, optionally generate (or offer to draft)
+  a concise release summary post in English for community announcements,
+  listing only features verified as working in that build.
 
 ## Verification Gates
 

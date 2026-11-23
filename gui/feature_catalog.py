@@ -133,11 +133,22 @@ FEATURE_GROUPS = (
         Feature("08.05", "allow_unknown", None, "--force", "Allow non-reference APK"),
         Feature("08.06", "hero_exp_cap", None, "always on", "Hero EXP cap and Limit Break floor"),
         Feature("08.07", "convert_hex_guard", None, "always on", "Non-hex inventory sync guard (KB-001)"),
+        Feature("08.08", "dungeon_recom_info", None, "always on", "Mercenary auto-select recommendations"),
     )),
     FeatureGroup("12", "Original hero modifications", (
         Feature("12.01", "alex_awakening", "var_alex_awakening", "--alex-awakening", "Alex Awakening: Destiny Lance"),
         Feature("12.02", "alex_rebalance", "var_alex_rebalance", "--alex-rebalance", "Alex Skill, Passive & Awake Rebalance (Skill 1 = Skill 2 geometry; Skill 2 reduces Defense)"),
         Feature("12.03", "alex_heros_mark", "var_alex_heros_mark", "--alex-heros-mark", "Alex's Hero's Mark — The Unbroken Lance"),
+    )),
+    FeatureGroup("13", "Heroes and traits", (
+        Feature("13.01", "trait_max_quality", "var_trait_max_quality", "--trait-max-quality", "Traits: Max quality on every roll"),
+        Feature("13.02", "trait_allow_duplicates", "var_trait_allow_duplicates", "--trait-allow-duplicates", "Allow duplicate hero traits across slots"),
+        Feature("13.03", "limit_break_step_10", "var_limit_break_step_10", "--limit-break-step-10", "Limit Break opens +10 levels per step (to Lv 120)"),
+        Feature("13.04", "trait_multi_unique", "var_trait_multi_unique", "--trait-multi-unique", "Traits: Multi-roll batch never repeats attributes"),
+        Feature("13.05", "trait_immunity_weight_x2", "var_trait_immunity_weight_x2", "--trait-immunity-weight-x2", "Traits: Double immunity weights (Slots 3-5)"),
+    )),
+    FeatureGroup("14", "Auto-battle AI", (
+        Feature("14.01", "merlin_auto_support", "var_merlin_auto_support", "--merlin-auto-support", "Merlin Slot-1 Auto Mode: Awake, then Magic infusion (strongest Awakening first), before bonus or item cells"),
     )),
 )
 
