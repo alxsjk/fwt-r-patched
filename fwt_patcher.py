@@ -394,6 +394,7 @@ def run_cli(args: argparse.Namespace) -> int:
         guild_raid_score_fix=(args.all or args.guild_raid_score_fix),
         guild_raid_fire_support=(args.all or args.guild_raid_fire_support),
         guild_raid_protection_persist=(args.all or args.guild_raid_protection_persist),
+        guild_raid_skill_turn_gate=(args.all or args.guild_raid_skill_turn_gate),
         alex_heros_mark=(args.all or args.alex_heros_mark),
         guild_raid_skills_max=(args.all or args.guild_raid_skills_max),
         guild_raid_boss_no_counter=(args.all or args.guild_raid_boss_no_counter),
@@ -724,6 +725,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--guild-raid-protection-persist",
         action="store_true",
         help="Make Absolute Protection reduce every hit on protected allies until its turn expiry instead of only the first hit",
+    )
+    parser.add_argument(
+        "--guild-raid-skill-turn-gate",
+        action="store_true",
+        help="Auto-cast each of the 3 non-Fire-Support Guild Raid skills at most once per raid turn while reserved",
     )
     parser.add_argument("--single-black-hammer", action="store_true", help="Use 1 black hammer per +16..+26 transcendence attempt")
     parser.add_argument("--equipment-tier-upgrades", action="store_true", help="Use one hammer to complete an equipment transcendence tier")

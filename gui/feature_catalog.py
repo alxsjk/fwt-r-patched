@@ -124,6 +124,13 @@ FEATURE_GROUPS = (
             "--guild-raid-protection-persist",
             "Guild Raid Absolute Protection persists for all hits",
         ),
+        Feature(
+            "07.10",
+            "guild_raid_skill_turn_gate",
+            "var_guild_raid_skill_turn_gate",
+            "--guild-raid-skill-turn-gate",
+            "Guild Raid lord skills auto-cast at most once per turn (Fire Support untouched)",
+        ),
     )),
     FeatureGroup("08", "Language, network and build", (
         Feature("08.01", "english_localization", "var_english", "--english", "English localization"),

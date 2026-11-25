@@ -656,6 +656,7 @@ class MainWindow(tk.Tk):
         self.var_guild_raid_skills_max = tk.BooleanVar(value=True)
         self.var_guild_raid_boss_no_counter = tk.BooleanVar(value=True)
         self.var_guild_raid_protection_persist = tk.BooleanVar(value=True)
+        self.var_guild_raid_skill_turn_gate = tk.BooleanVar(value=True)
         self.var_single_black_hammer = tk.BooleanVar(value=True)
         self.var_equipment_tier_upgrades = tk.BooleanVar(value=True)
         self.var_single_gem_fang = tk.BooleanVar(value=True)
@@ -751,6 +752,11 @@ class MainWindow(tk.Tk):
                 self.var_guild_raid_protection_persist,
                 "Guild Raid Absolute Protection Persists for All Hits",
                 "Keeps the Absolute Protection shield active for every hit on protected allies until its turn expiry, instead of only the first hit per ally",
+            ),
+            (
+                self.var_guild_raid_skill_turn_gate,
+                "Guild Raid Lord Skills Auto-Cast Once per Turn",
+                "Auto-casts Guild Shelling, Absolute Protection and Combat Support at most once per raid turn while reserved; Fire Support keeps its minion gate",
             ),
             (self.var_single_black_hammer, "Single Black Hammer (+16..+26)", "Uses one black hammer per transcendence attempt instead of scaling 1, 2, 3..."),
             (self.var_equipment_tier_upgrades, "One Hammer per Equipment Tier", "One hammer advances equipment to +15, +20 or +26, depending on its current tier"),
@@ -1757,6 +1763,7 @@ class MainWindow(tk.Tk):
             guild_raid_skills_max=self.var_guild_raid_skills_max.get(),
             guild_raid_boss_no_counter=self.var_guild_raid_boss_no_counter.get(),
             guild_raid_protection_persist=self.var_guild_raid_protection_persist.get(),
+            guild_raid_skill_turn_gate=self.var_guild_raid_skill_turn_gate.get(),
             single_black_hammer=self.var_single_black_hammer.get(),
             equipment_tier_upgrades=self.var_equipment_tier_upgrades.get(),
             single_gem_fang=self.var_single_gem_fang.get(),

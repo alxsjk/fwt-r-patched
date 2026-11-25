@@ -302,6 +302,7 @@ Status legend:
 | 59 | `trait_immunity_weight_x2` | Traits: Double Immunity Weights (Slots 3-5) | SO | `kFwtPotentialDataRows` (`0x6CBBC8`) rows `300` (`id=35001, col=6`), `301` (`id=36001, col=12`), `302` (`id=37001, col=9`): stock weight `335` -> `20000` (2x normal `10000` stats) | Active (13.05; shipped by `--all`, orthogonal to `trait_max_quality` `13.01`) |
 | 60 | `dungeon_recom_info` | Mercenary Auto-Select Recommendations (`DUNGEON_RECOM_INFO`) | SO | `fwt::EmbeddedStub::handle_json_request` dispatch call `0x7DAED0` (`bl 0x7E4030`) -> cave `0xB301F8` (832 B, parseEncoding family): byte-scans the request for `"DUNGEON_RECOM_INFO"`, forwards other CMDs untouched, answers `recom_list` via `load_state_snapshot` (`0x7DDECC`) + `friend_list_json` (`0x8D5674`) + `int_field` packet_no echo (`0x7E08B8`), plain-ack fallback when the state cannot load | Always-on bug fix (08.08); the pre-battle "auto select" finally receives candidate mercenaries |
 
+| 61 | `guild_raid_skill_turn_gate` | Guild Raid Lord Skills Auto-Cast Once per Turn | SO + client (runtime) | boot word `0xAB3374` (`mov w4, w19` -> `bl` cave `0xB30990`, 388 B) installs the 4-word absolute stub over `Player$$ExecuteReservedLordSkill` RVA `0x018E6FF0` (expected `0x2A1403E0, 0xAA1F03E1, 0x97FC1B68, 0x370019C0`) via `PATCH_IL2CPP_HELPER`; the body replays the block and gates `0x20000001/0x20000003/0x20000004` on `{instance, turn, mask}` at `0xBE62C8` -> hold `0x018E7334` / mark + resume `0x018E7000` | Active (07.10; shipped in `--all`; Fire Support `0x20000002` untouched) |
 Build & infrastructure fields on `PatchOptions` (not gameplay patches): `server_ip` / `server_port` (target endpoint when `lan_redirect` is enabled, defaults `127.0.0.1:8010`), `align_16k` (Android 16 KB page alignment, default `True`, disabled with `--no-16k`), `allow_unknown` (bypass reference-APK guard via `--force`), and `dev` (`DevOptions`, documented in [`docs/DEV_BUILD.md`](DEV_BUILD.md)).
 
 ### 3.1 Per-Patch Details
@@ -1753,3 +1754,39 @@ mode`; no package-3 purchase or reward occurred. The user subsequently purchased
 primary emulator log reported success and its save recorded one purchase and
 one original random costume mail. The patch preserves the price and payment
 handling.
+
+#### 61. `guild_raid_skill_turn_gate` — Guild Raid Lord Skills Auto-Cast Once per Turn
+
+- Stock auto-cast executes a reserved lord skill the moment `lordGauge >= 15`
+  and re-executes it whenever the gauge recharges inside the same turn. For
+  one-turn effects (Absolute Protection, Combat Support) and burst damage
+  already delivered (Guild Shelling) the second same-turn cast wastes gauge.
+- The boot flow's common exit path carries six one-word installer sites;
+  `0xAB3374` (`mov w4, w19`) runs last, after
+  `0xAB32F4` (07.09), `0xAB3300` (14.01), `0xAB3304` (12.03),
+  `0xAB335C` (07.06) and `0xAB3370` (08.07). The cave replays the word and
+  resumes at `0xAB3378`.
+- Client site `0x018E6FF0` is the last stock hold gate of
+  `Player$$ExecuteReservedLordSkill` (`0x018E6DAC`): after the
+  `stageType == 7` branch (`0x018E6F48..0x018E6F50`), the skill id load
+  (`mov w20, w0` at `0x018E6FD0`) and the gauge check
+  (`cmp w0, #0xf` at `0x018E6E74`), every one of the four guild skills passes
+  `mov w0,w20 / mov x1,xzr / bl 0x17edd98 / tbnz w0,#0 -> 0x018E7334` — and no
+  branch lands inside the 16-byte window, which ends exactly where the 07.06
+  stub (`0x018E7060..0x018E706F`) begins.
+- State lives at `0xBE62C8..0xBE62D8` — the RW page tail immediately after
+  `alex_awakening_scratch` (`0xBE6268..0xBE62C8`), beyond the last
+  `PT_LOAD p_memsz` yet inside the loader-mapped last page, outside every
+  symbol — the same technique 12.01 already ships. Instance change resets the
+  whole slot; turn change clears only the mask.
+- `d = w20 - 0x20000001`: `d == 1` (Fire Support) and `d > 3` (unexpected)
+  resume unmarked — the 07.06 minion gate keeps sole authority over Fire
+  Support; `d in {0, 2, 3}` gate on bits `0, 1, 2` respectively. A null
+  `GameStage::get_instance` (`0x01640248`) fails open to stock; the turn
+  comes from `GameStage::get_currentTurnNo` (`0x01641F38`, 0-based).
+- Reference patch count: 2 (hook + cave). Emulated end-to-end with Unicorn in
+  `tests/test_guild_raid_skill_turn_gate.py`, including the installer matrix
+  (helper writes / refuses / no cached base) and the runtime matrix
+  (first cast, same-turn hold per skill, turn-advance release, Fire Support
+  unmarked, unknown ids, stock-hold precedence, null-instance fail-open,
+  instance-change reset, frame discipline on both exits).

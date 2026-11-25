@@ -302,6 +302,7 @@ from core.dungeon_recom_info import inspect_dungeon_recom_info
 from core.equipment_tier_upgrades import inspect_equipment_tiers
 from core.guild_raid_fire_support import inspect_guild_raid_fire_support
 from core.guild_raid_protection_persist import inspect_guild_raid_protection_persist
+from core.guild_raid_skill_turn_gate import inspect_guild_raid_skill_turn_gate
 from core.hero_shop_offers import inspect_hero_shop_offers
 from core.merlin_auto_support import inspect_merlin_auto_support
 from core.mythical_shop import inspect_mythical_shop
@@ -1864,6 +1865,27 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             reports,
             "guild_raid_protection_persist",
             "Guild Raid Absolute Protection Persists for All Hits",
+            False,
+            "Unknown",
+            str(exc),
+        )
+
+    # 12q. Guild Raid Lord-Skill Turn Gate Check
+    try:
+        active = inspect_guild_raid_skill_turn_gate(so_bytes, seg_offset)
+        _feature(
+            reports,
+            "guild_raid_skill_turn_gate",
+            "Guild Raid Lord-Skill Auto-Cast Once per Turn",
+            active,
+            "Active (once per turn per skill)" if active else "Original",
+            "0xAB3374 -> 0xB30990 runtime hook checked",
+        )
+    except Exception as exc:
+        _feature(
+            reports,
+            "guild_raid_skill_turn_gate",
+            "Guild Raid Lord-Skill Auto-Cast Once per Turn",
             False,
             "Unknown",
             str(exc),
@@ -3700,6 +3722,10 @@ def expected_feature_keys(options: PatchOptions) -> dict[str, str]:
     if options.guild_raid_protection_persist:
         expected["guild_raid_protection_persist"] = (
             "Guild Raid Absolute Protection Persists for All Hits"
+        )
+    if options.guild_raid_skill_turn_gate:
+        expected["guild_raid_skill_turn_gate"] = (
+            "Guild Raid Lord-Skill Auto-Cast Once per Turn"
         )
     if options.merlin_auto_support:
         expected["merlin_auto_support"] = (

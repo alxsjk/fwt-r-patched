@@ -65,6 +65,19 @@ from core.guild_raid_protection_persist import (
     CAVE_VADDR as GUILD_RAID_PROTECTION_PERSIST_CAVE_VADDR,
 )
 from core.guild_raid_protection_persist import apply_guild_raid_protection_persist
+from core.guild_raid_skill_turn_gate import (
+    CAVE_SIZE as GUILD_RAID_SKILL_TURN_GATE_CAVE_SIZE,
+)
+from core.guild_raid_skill_turn_gate import (
+    CAVE_VADDR as GUILD_RAID_SKILL_TURN_GATE_CAVE_VADDR,
+)
+from core.guild_raid_skill_turn_gate import (
+    STATE_SLOT_SIZE as GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_SIZE,
+)
+from core.guild_raid_skill_turn_gate import (
+    STATE_SLOT_VADDR as GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_VADDR,
+)
+from core.guild_raid_skill_turn_gate import apply_guild_raid_skill_turn_gate
 from core.hero_shop_offers import apply_hero_shop_offers
 from core.merlin_auto_support import (
     CAVE_SIZE as MERLIN_AUTO_SUPPORT_CAVE_SIZE,
@@ -2014,6 +2027,7 @@ EXPECTED_PATCH_COUNTS = {
     "guild_raid_score_fix": 2,
     "guild_raid_fire_support": 2,
     "guild_raid_protection_persist": 2,
+    "guild_raid_skill_turn_gate": 2,
     "single_black_hammer": 1,
     "single_gem_fang": 5,
     "upgrade_no_fail_above_20": 5,
@@ -2132,6 +2146,7 @@ IDEMPOTENT_PATCHES: frozenset[str] = frozenset({
     "guild_raid_reward_x10",
     "guild_raid_fire_support",
     "guild_raid_protection_persist",
+    "guild_raid_skill_turn_gate",
     "alex_heros_mark",
     "dev_log_dispatch",
     "dev_build_marker",
@@ -2364,6 +2379,7 @@ class PatchOptions:
     guild_raid_skills_max: bool = False    # Max remaining 3 Guild Raid skills (1M/100%)
     guild_raid_boss_no_counter: bool = False  # Zero Guild Raid boss counter rate (0%)
     guild_raid_protection_persist: bool = False  # Absolute Protection DR covers all hits until expiry
+    guild_raid_skill_turn_gate: bool = False  # One auto-cast per turn for the 3 non-Fire-Support guild skills
     alex_heros_mark: bool = False  # Alex's Hero's Mark "The Unbroken Lance" (12.03)
     trait_max_quality: bool = False  # hero trait rolls always land on top quality (grade 5)
     trait_allow_duplicates: bool = False  # allow repeating the same trait type across slots
@@ -3761,6 +3777,17 @@ def validate_cave_layout() -> None:
         "guild_raid_protection_persist",
         GUILD_RAID_PROTECTION_PERSIST_CAVE_VADDR,
         GUILD_RAID_PROTECTION_PERSIST_CAVE_VADDR + GUILD_RAID_PROTECTION_PERSIST_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "guild_raid_skill_turn_gate",
+        GUILD_RAID_SKILL_TURN_GATE_CAVE_VADDR,
+        GUILD_RAID_SKILL_TURN_GATE_CAVE_VADDR + GUILD_RAID_SKILL_TURN_GATE_CAVE_SIZE,
+    ))
+    common_ranges.append((
+        "guild_raid_skill_turn_gate_state",
+        GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_VADDR,
+        GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_VADDR
+        + GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_SIZE,
     ))
     common_ranges.append((
         "alex_heros_mark_server",
@@ -7740,6 +7767,12 @@ def apply_all_patches(
         record(
             "guild_raid_protection_persist",
             apply_guild_raid_protection_persist(so_buf, seg_offset),
+        )
+
+    if options.guild_raid_skill_turn_gate:
+        record(
+            "guild_raid_skill_turn_gate",
+            apply_guild_raid_skill_turn_gate(so_buf, seg_offset),
         )
 
     if options.alex_heros_mark:
