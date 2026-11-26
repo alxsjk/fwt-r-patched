@@ -17,7 +17,7 @@ Run this checklist before tagging a release, building distribution archives, or 
    - `README.md` header and versioned filename examples
    - `docs/FEATURE_CATALOG.md` header
    - Top released section in `CHANGELOG.md` (with `## [Unreleased]` present above it)
-2. Run `pytest -q tests/test_version.py tests/test_suite_health.py`.
+2. Run `pytest -q tests/test_version.py tests/test_suite_health.py tests/test_skills_health.py`.
 
 ## 2. English-Only, PII, Secrets & Copyright Hygiene
 
@@ -32,15 +32,16 @@ Run this checklist before tagging a release, building distribution archives, or 
 ## 3. GitHub Authorial Governance & CI Integrity
 
 1. Verify `.github/CODEOWNERS`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `.github/workflows/pr-policy.yml`, `.github/workflows/pr-policy-comment.yml`, `.github/workflows/issue-triage.yml`, issue/PR templates, and `CONTRIBUTING.md` stay synchronized.
-2. Run `pytest -q tests/test_github_workflows.py` to enforce fork-safety invariants (no `actions/checkout` on `pull_request_target`/`issues`, env-var input passing, no job-level `if:` on `PR Policy (Approved Issue)`).
-3. Never commit or modify Spec Kit manifest-tracked files under `.specify/scripts/`, `.specify/templates/`, or `.agents/skills/speckit-*`.
+2. Run `pytest -q tests/test_github_workflows.py tests/test_principle_v_invariants.py` to enforce fork-safety invariants (no `actions/checkout` on `pull_request_target`/`issues`, env-var input passing, no job-level `if:` on `PR Policy (Approved Issue)`) and Constitution Principle V release-gate checks.
+3. Never commit or modify Spec Kit manifest-tracked core files under `.specify/scripts/`, `.specify/templates/*.md`, or `.agents/skills/speckit-*` (intentional project template overrides belong under `.specify/templates/overrides/`).
 
 ## 4. Release Packaging & Verification Gates
 
-1. Run release packaging only from verified release APKs (`tools/create_distribution_zip.py`, `tools/register_release.py`); both must reject `--dev` or non-reference builds (`assets/fwt_re_patched_build_type.txt`).
+1. Verify built release APKs with `tools/verify_release_apk.py`, and run release packaging only from verified release APKs (`tools/create_distribution_zip.py`, `tools/register_release.py`); packaging and registration must reject `--dev` or non-reference builds (`assets/fwt_re_patched_build_type.txt`).
 2. Run all verification gates after the final edit:
    - `python -m compileall -q core gui tools tests fwt_patcher.py`
    - `ruff check .`
    - `mypy core gui fwt_patcher.py tools tests`
-   - `pytest -q -m "not integration and not slow" --cov=core` (and `pytest -q` when `source/` reference APK is available)
+   - `python -m pip_audit` (recommended dependency vulnerability check matching `.github/workflows/ci.yml`)
+   - `pytest -q -m "not integration and not slow" --cov=core` (and `pytest -q` when the reference APK is available under `source/`)
    - Ensure `git status --short` contains no `.coverage` or temporary artifacts before committing.

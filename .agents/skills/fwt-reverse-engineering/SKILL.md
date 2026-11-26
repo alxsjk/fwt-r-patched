@@ -28,7 +28,7 @@ Use this skill when inspecting `libfwt_local_server.so`, `libil2cpp.so` RVAs, lo
 ## UnityFS Datatable & Dev Build Rules
 
 1. **Float32 quantization**: Unity serializes `MonoBehaviour` floats as IEEE-754 float32. Quantize modified floats with `struct.unpack("<f", struct.pack("<f", val))[0]` before saving so round-trip checks pass deterministically.
-2. **Preserve bundle compression**: Save modified `UnityPy` assets with `packer="original"`, re-encrypt with `_encrypt_datatable`, and reload to assert round-trip equality.
-3. **DEX resource contract**: Whenever assets inside `assets/fwt_resources_v1.zip` change, ensure `ResourceContract` / `HASHED_CRITICAL_FILES` in `classes8.dex` is updated in lockstep.
+2. **Preserve bundle compression**: Save modified `UnityPy` assets with `packer="original"`, re-encrypt with `_encrypt_datatable()` in `core/apk_tooling.py`, and reload to assert round-trip equality.
+3. **DEX resource contract**: Whenever assets inside `assets/fwt_resources_v1.zip` change, ensure `ResourceContract` / `_patch_resource_contract()` in `core/dex_smali.py` (which updates the `HASHED_CRITICAL_FILES` contract in `classes8.dex`) is updated in lockstep.
 4. **Dev isolation**: Use `--dev` telemetry flags (`docs/DEV_BUILD.md`, parsed by `tools/dev_log_parse.py`) for device debugging; never enable `--dev-debuggable` alongside gameplay patches on production installs, and never allow dev builds in release archives.
 5. **No proprietary binaries in git**: Keep `source/`, `output/`, `backups/`, `keystore/`, and `.env` strictly untracked.

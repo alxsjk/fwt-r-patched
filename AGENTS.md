@@ -18,7 +18,7 @@ Read [`.specify/memory/constitution.md`](.specify/memory/constitution.md) before
 
 ## Spec Kit Workflow & Skills
 
-Project skills live under [`.agents/skills/`](.agents/skills/), alongside optional local **GitHub Spec Kit** scaffolding (`.specify/` and `speckit-*` skills, ignored in git when installed locally):
+Project skills live under [`.agents/skills/`](.agents/skills/), alongside optional local **GitHub Spec Kit** scaffolding (`.specify/` and `speckit-*` skills, ignored in git when installed locally except `.specify/memory/constitution.md` and `.specify/templates/overrides/`):
 
 - `/speckit-constitution` — Establish or amend [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
 - `/speckit-specify` — Create a feature specification under `specs/<NNN-short-name>/spec.md`.
@@ -40,7 +40,7 @@ Project-specific skills complement Spec Kit (keep all edits outside the Spec Kit
 - `fwt-reverse-engineering`: Safe reverse-engineering workflow for `libfwt_local_server.so`, `libil2cpp.so`, and UnityFS datatables (RE output hygiene, dead-code traps, `patch_audit.py`, key extraction without echoing secrets, `float32` quantization).
 - `fwt-pre-release-audit`: Pre-release and GitHub publication verification (version parity, English-only sweep, secrets/PII/copyright hygiene, `.github/` governance checks, release build guards, verification gates).
 
-> **Cross-platform note on `.specify/scripts/python/*.py`**: Upstream skill prompts invoke `python3 .specify/scripts/python/<script>.py`. On Windows, if `python3` is unavailable or resolves to the Store alias, run the script using `.\.venv\Scripts\python.exe .specify/scripts/python/<script>.py` (on Linux, `.venv/bin/python`). If `.venv/` on a shared drive is a Linux virtualenv (`bin/`), invoke the native Windows Python 3.12+ interpreter instead.
+> **Cross-platform note on `.specify/scripts/python/*.py`**: Generated Spec Kit skill prompts invoke `.venv/bin/python .specify/scripts/python/<script>.py` (or `python3 .specify/scripts/python/<script>.py`, depending on the host where `specify init` ran). On Windows, run the script using `.\.venv\Scripts\python.exe .specify/scripts/python/<script>.py` instead (on Linux, `.venv/bin/python`). If `.venv/` on a shared drive is a Linux virtualenv (`bin/`), invoke the native Windows Python 3.12+ interpreter instead.
 
 ## Repository Layout
 
@@ -48,7 +48,7 @@ Project-specific skills complement Spec Kit (keep all edits outside the Spec Kit
 - `gui/`: Desktop interface (`main_window.py`, `components.py`, `theme.py`) and stable feature grouping/IDs (`feature_catalog.py`).
 - `fwt_patcher.py`: CLI entry point (`fwt-patcher`).
 - `tools/`: Reverse-engineering helpers, ELF/code-cave generators, `.env` cipher extractor (`extract_env_keys.py`), ADB probes, and release packagers (`create_distribution_zip.py`, `register_release.py`, `verify_release_apk.py`).
-- `tests/`: Unit, Keystone/Capstone/Unicorn emulation, GUI parity, inspector, GitHub workflow policy (`test_github_workflows.py`), Principle V invariant (`test_principle_v_invariants.py`), and APK-backed `integration` tests.
+- `tests/`: Unit, Keystone/Capstone/Unicorn emulation, GUI parity, inspector, GitHub workflow policy (`test_github_workflows.py`), Principle V invariant (`test_principle_v_invariants.py`), skills/Spec Kit health (`test_skills_health.py`), and APK-backed `integration` tests.
 - `docs/`: Feature index (`FEATURE_CATALOG.md`) and technical reference docs (`PATCH_SPEC.md`, `CODE_CAVES.md`, `DEV_BUILD.md`, `AUTO_MODE_AI_GUIDE.md`, `GUILD_RAID_SELF_MERCENARY.md`, `HEROS_MARK_GUIDE.md`, `HERO_AWAKENING_GUIDE.md`, `KNOWN_BUGS.md`, `SKILL_REBALANCE_GUIDE.md`, `SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md`).
 - `scripts/`: Toolchain setup (`setup-linux-toolchain.sh`).
 - `.github/`: CI & release workflows (`ci.yml`, `release.yml`), `dependabot.yml`, `CODEOWNERS`, issue/PR templates, and authorial PR/issue governance workflows (`pr-policy.yml`, `pr-policy-comment.yml`, `issue-triage.yml`).
@@ -134,7 +134,7 @@ Before changing development build instrumentation:
 ### Git Hygiene & Sensitive Files
 
 - Never commit copyrighted binaries (`source/`, `*.apk`, `*.so`, `*.dex`, `*.dat`), user saves (`backups/`), signing keystores (`keystore/`), secrets (`.env`, `*.local.json`), build outputs (`output/`), coverage files (`.coverage`), or local editor/harness directories (`.commandcode/`).
-- Do not manually edit generated files under `.specify/scripts/`, `.specify/templates/`, or `.agents/skills/speckit-*` unless overriding intentionally via Spec Kit presets/extensions (checksums are tracked in `.specify/integrations/*.manifest.json`).
+- Do not manually edit Spec Kit manifest-tracked files under `.specify/scripts/`, `.specify/templates/*.md`, or `.agents/skills/speckit-*` (checksums are tracked in `.specify/integrations/*.manifest.json`). Place intentional project template overrides under `.specify/templates/overrides/` instead.
 
 ## Release Builds & Documentation
 

@@ -12,7 +12,7 @@ All patching, ELF/DEX manipulation, APK alignment/signing, and inspection logic 
 
 ### III. Verification Gates & Emulation Evidence
 
-Changes to ARM64 patches or code caves MUST carry reproducible automated evidence (Keystone/Capstone instruction checks, Unicorn emulation where applicable, and inspector assertions) plus device validation before claiming runtime behavior. Every change set MUST pass `compileall`, `ruff check .`, `mypy core gui fwt_patcher.py tools tests`, non-integration tests (`pytest -q -m "not integration" --cov=core` meeting the configured coverage floor), and integration tests when the proprietary reference APK is present in `source/`.
+Changes to ARM64 patches or code caves MUST carry reproducible automated evidence (Keystone/Capstone instruction checks, Unicorn emulation where applicable, and inspector assertions) plus device validation before claiming runtime behavior. Every change set MUST pass `compileall`, `ruff check .`, `mypy core gui fwt_patcher.py tools tests`, non-integration tests (`pytest -q -m "not integration and not slow" --cov=core` meeting the configured coverage floor), and integration tests when the proprietary reference APK is present in `source/`.
 
 ### IV. Release Isolation & Zero Copyrighted Assets
 
@@ -39,4 +39,4 @@ Patched APKs MUST store native `.so` libraries uncompressed, enforce `PT_LOAD p_
 
 This constitution supersedes ad-hoc conventions for all human and AI-agent contributions. Amendments follow semantic versioning (`MAJOR` for breaking principle removals/redefinitions, `MINOR` for new principles or expanded gates, `PATCH` for clarifications) and SHOULD be performed via `/speckit-constitution`. Any intentional deviation from a principle or complexity exception MUST be justified in writing in `docs/` or the active feature `plan.md` Complexity Tracking table. Runtime agent guidance lives in `AGENTS.md`.
 
-**Version**: 1.0.1 | **Ratified**: 2026-11-13 | **Last Amended**: 2026-11-19
+**Version**: 1.0.2 | **Ratified**: 2026-11-13 | **Last Amended**: 2026-11-26

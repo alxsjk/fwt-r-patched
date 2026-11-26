@@ -81,6 +81,9 @@ htmlcov/
 !.specify/memory/
 .specify/memory/*
 !.specify/memory/constitution.md
+!.specify/templates/
+.specify/templates/*
+!.specify/templates/overrides/
 specs/
 .commandcode/
 .codex-attachments/

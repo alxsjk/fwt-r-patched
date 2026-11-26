@@ -13,7 +13,7 @@ Follow this workflow whenever implementing or changing a gameplay feature or bug
 ## Before Editing
 
 1. Read `docs/PATCH_SPEC.md`, `docs/CODE_CAVES.md`, and `docs/FEATURE_CATALOG.md`.
-2. Verify whether an existing module under `core/` owns the feature (`core_patches.py`, `alex_awakening*.py`, `alex_heros_mark.py`, `alex_rebalance.py`, `convert_hex_guard.py`, `costume_package*.py`, `dungeon_recom_info.py`, `equipment_tier_upgrades.py`, `guild_raid_*.py`, `hero_shop_offers.py`, `merlin_auto_support.py`, `mythical_shop.py`, `surprise_transcendence_package.py`, `dex_smali.py`, or `axml.py`).
+2. Inspect `core/` to verify whether an existing entry point (`core/core_patches.py`, `core/apk_tooling.py`, `core/dex_smali.py`, `core/axml.py`, `core/elf_mapping.py`, `core/patch_inspector.py`) or a dedicated feature module under `core/` already owns the feature.
 
 ## Implementation Checklist
 
@@ -24,7 +24,8 @@ Follow this workflow whenever implementing or changing a gameplay feature or bug
    - Allocate new native trampolines only from audited dead ranges (for example, remaining headroom or `tools/dead_code_map.py` candidates verified with `tools/lab_trap_apk.py`).
    - Register every new cave or scratch interval in `validate_cave_layout()` in `core/core_patches.py`.
 3. **Options & Conflict Validation (`core/core_patches.py`)**:
-   - Add or update the field on `PatchOptions` (with expected counts in `EXPECTED_PATCH_COUNTS`).
+   - Add or update the field on `PatchOptions` (and update `EXPECTED_PATCH_COUNTS` when the patch has a deterministic occurrence count).
+   - For non-boolean `PatchOptions` fields, register the field in `_INTEGER_FEATURE_SCALES` or `_NON_FEATURE_FIELDS` in `tests/test_suite_health.py`.
    - Update `validate_patch_options()` for mutual exclusions, `--force` incompatibilities, or numeric bounds.
    - Never let `--all` or release patches leak into `DevOptions`.
 4. **Independent Verification (`core/patch_inspector.py`)**:
@@ -48,4 +49,4 @@ Run using the project virtualenv (`.\.venv\Scripts\python.exe` or `.venv/bin/pyt
 2. `ruff check .`
 3. `mypy core gui fwt_patcher.py tools tests`
 4. `pytest -q tests/test_gui_feature_parity.py tests/test_suite_health.py`
-5. `pytest -q -m "not integration and not slow" --cov=core` (and `pytest -q` when `source/fwt_0.682_offline_v1574.apk` is available)
+5. `pytest -q -m "not integration and not slow" --cov=core` (and `pytest -q` when the reference APK is available under `source/`)
