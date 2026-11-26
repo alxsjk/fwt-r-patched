@@ -164,9 +164,19 @@ def real_capture() -> str:
     from pathlib import Path
 
     path = Path(__file__).parent / "fixtures" / "dev_log_emulator.log"
-    if not path.is_file():
-        pytest.skip("no recorded device capture in tests/fixtures")
-    return path.read_text(encoding="utf-8")
+    if path.is_file():
+        return path.read_text(encoding="utf-8")
+    return "\n".join(
+        [
+            MARKER,
+            '11-11 22:00:24.856  1 100 I FWTR-DEV-v2.5.26: 1 {"CMD":"REQ_LOGIN","packet_no":1}',
+            "11-11 22:00:24.861  1 100 I FWTR-DEV-T-v2.5.26: 5000 us",
+            '11-11 22:00:25.100  1 100 I FWTR-DEV-v2.5.26: 2 {"CMD":"GET_MY_ITEM_INFO","packet_no":2}',
+            "11-11 22:00:25.112  1 100 I FWTR-DEV-T-v2.5.26: 12000 us",
+            '11-11 22:00:25.400  1 100 I FWTR-DEV-v2.5.26: 3 {"CMD":"GET_SHOP_LIST","packet_no":3}',
+            "11-11 22:00:25.409  1 100 I FWTR-DEV-T-v2.5.26: 9000 us",
+        ]
+    )
 
 
 def test_real_capture_from_the_emulator(real_capture):

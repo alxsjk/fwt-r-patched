@@ -14,7 +14,7 @@ body:
     attributes:
       label: Patcher Version
       description: Output of `python fwt_patcher.py --version`
-      placeholder: "2.5.50"
+      placeholder: "2.5.60"
     validations:
       required: true
 

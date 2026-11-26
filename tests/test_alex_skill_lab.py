@@ -107,11 +107,8 @@ def test_core_engine_applies_and_inspects_alex(reference_buffers: tuple[bytes, b
 
 
 @pytest.mark.integration
-def test_core_assets_match_round_tripped_laboratory_fixture() -> None:
-    apk = Path("source/fwt_0.682_offline_v1574.apk")
-    if not apk.is_file():
-        pytest.skip("reference APK not present")
-    with (zipfile.ZipFile(apk) as outer,
+def test_core_assets_match_round_tripped_laboratory_fixture(reference_apk: Path) -> None:
+    with (zipfile.ZipFile(reference_apk) as outer,
           outer.open("assets/fwt_resources_v1.zip") as stream,
           zipfile.ZipFile(stream) as resources):
         gate = core_gate(resources.read(REBIRTH_PATH))

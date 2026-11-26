@@ -2019,7 +2019,6 @@ EXPECTED_PATCH_COUNTS = {
     "gem_level6": 9,
     "gem_upgrade_gold_half": 1,
     "rune_upgrade_discount": 4,
-    "gold_cylinder_fix": 0,
     "energy_flask_x10": 1,
     "gold_cylinder_x10": 2,
     "mana_cylinder_x10": len(MANA_CYLINDER_X10_SITES),
@@ -2095,7 +2094,6 @@ IDEMPOTENT_PATCHES: frozenset[str] = frozenset({
     "limit_break_step_10",
     "soulgear_enchant_always",
     "rune_upgrade_discount",
-    "gold_cylinder_fix",
     "no_win_box",
     "hero_exp_cap",
     "convert_hex_guard",
@@ -2608,37 +2606,6 @@ def encode_ldp_post_index(rt: int, rt2: int, imm: int) -> bytes:
     return struct.pack(
         "<I", 0xA8C00000 | (imm7 << 15) | (rt2 << 10) | (31 << 5) | rt
     )
-
-
-def encode_ldp_w_sp(rt: int, rt2: int, imm: int) -> bytes:
-    """Encodes ``ldp w<rt>, w<rt2>, [sp, #imm]`` (32-bit, signed offset)."""
-    if imm % 4 or not -256 <= imm <= 252:
-        raise ValueError(f"ldp w offset must be a multiple of 4 in [-256, 252]: {imm}")
-    imm7 = (imm // 4) & 0x7F
-    return struct.pack("<I", 0x29400000 | (imm7 << 15) | (rt2 << 10) | (31 << 5) | rt)
-
-
-def encode_ldur_x(rt: int, rn: int, imm: int) -> bytes:
-    """Encodes ``ldur x<rt>, [x<rn>, #imm]`` (64-bit, unscaled, signed 9-bit)."""
-    if not -256 <= imm <= 255:
-        raise ValueError(f"ldur offset out of range: {imm}")
-    return struct.pack("<I", 0xF8400000 | ((imm & 0x1FF) << 12) | (rn << 5) | rt)
-
-
-def encode_cbnz_x(rt: int, pc_vaddr: int, target_vaddr: int) -> bytes:
-    """Encodes ``cbnz x<rt>, #target``."""
-    delta = target_vaddr - pc_vaddr
-    if delta % 4 or not -(1 << 20) <= delta < (1 << 20):
-        raise ValueError(f"Invalid cbnz x target: 0x{pc_vaddr:x} -> 0x{target_vaddr:x}")
-    return struct.pack("<I", 0xB5000000 | (((delta // 4) & 0x7FFFF) << 5) | rt)
-
-
-def encode_cbz_x(rt: int, pc_vaddr: int, target_vaddr: int) -> bytes:
-    """Encodes ``cbz x<rt>, #target``."""
-    delta = target_vaddr - pc_vaddr
-    if delta % 4 or not -(1 << 20) <= delta < (1 << 20):
-        raise ValueError(f"Invalid cbz x target: 0x{pc_vaddr:x} -> 0x{target_vaddr:x}")
-    return struct.pack("<I", 0xB4000000 | (((delta // 4) & 0x7FFFF) << 5) | rt)
 
 
 def encode_eor_w(rd: int, rn: int, rm: int, shift: int = 0, amount: int = 0) -> bytes:
@@ -3328,6 +3295,14 @@ def _build_dev_timing_cave(
     return bytes(blob)
 
 
+DEV_TIMING_CAVE_ORIGINAL_SHA256 = (
+    "65435d0f6b99633c5649d144d4a57c9ddb5f62fbfd80f235b24ed62195bc4dc1"
+)
+DEV_LOG_CAVE_ORIGINAL_SHA256 = (
+    "ab883ffd94885ba7fd4c669e0610e9acb0949cd24ee1319092e190318502d096"
+)
+
+
 def apply_dev_handler_timing(
     buf: bytearray,
     *,
@@ -3343,17 +3318,27 @@ def apply_dev_handler_timing(
     place. The sites are validated first: a drifted build must fail loudly instead
     of branching out of an unrelated instruction.
     """
-    branch = encode_arm64_branch(DEV_TIMING_HOOK_SITES[0], DEV_TIMING_CAVE_VADDR)
-    first = seg_offset(DEV_TIMING_HOOK_SITES[0])
-    if bytes(buf[first : first + 4]) == branch:
-        return 0
+    site_states = []
     for site in DEV_TIMING_HOOK_SITES:
+        branch = encode_arm64_branch(site, DEV_TIMING_CAVE_VADDR)
         current = bytes(buf[seg_offset(site) : seg_offset(site) + 4])
-        if current != DEV_TIMING_RET:
+        if current == branch:
+            site_states.append("patched")
+        elif current == DEV_TIMING_RET:
+            site_states.append("stock")
+        else:
             raise ValueError(
                 f"timing hook site 0x{site:x} holds {current.hex()}, "
                 f"expected {DEV_TIMING_RET.hex()} (ret)"
             )
+    if len(set(site_states)) != 1:
+        raise ValueError("Partially patched dev timing hook sites")
+    if site_states[0] == "patched":
+        return 0
+    cave_off = seg_offset(DEV_TIMING_CAVE_VADDR)
+    cur_cave = bytes(buf[cave_off : cave_off + DEV_TIMING_CAVE_SIZE])
+    if hashlib.sha256(cur_cave).hexdigest() != DEV_TIMING_CAVE_ORIGINAL_SHA256:
+        raise ValueError("Unexpected original bytes in dev timing cave")
     cave = _build_dev_timing_cave(
         DEV_TIMING_CAVE_VADDR,
         tag=tag,
@@ -3362,7 +3347,7 @@ def apply_dev_handler_timing(
         limit=limit,
         dev_dump=dev_dump,
     )
-    _write_bytes(buf, seg_offset(DEV_TIMING_CAVE_VADDR), cave, "dev timing cave")
+    _write_bytes(buf, cave_off, cave, "dev timing cave")
     for site in DEV_TIMING_HOOK_SITES:
         _write_bytes(
             buf,
@@ -3419,6 +3404,10 @@ def apply_dev_dispatch_log(
             f"dev log hook site at 0x{DEV_LOG_HOOK_VADDR:x} holds {current.hex()}, "
             f"expected {DEV_LOG_HOOK_ORIGINAL.hex()} (sub sp, sp, #0x90)"
         )
+    cave_off = seg_offset(DEV_LOG_CAVE_VADDR)
+    cur_cave = bytes(buf[cave_off : cave_off + DEV_LOG_CAVE_SIZE])
+    if hashlib.sha256(cur_cave).hexdigest() != DEV_LOG_CAVE_ORIGINAL_SHA256:
+        raise ValueError("Unexpected original bytes in dev dispatch log cave")
     cave = _build_dev_log_cave(
         DEV_LOG_CAVE_VADDR,
         limit=limit,
@@ -3431,31 +3420,9 @@ def apply_dev_dispatch_log(
         capture_sret=capture_sret,
         dev_dump=dev_dump,
     )
-    _write_bytes(buf, seg_offset(DEV_LOG_CAVE_VADDR), cave, "dev log cave")
+    _write_bytes(buf, cave_off, cave, "dev log cave")
     _write_bytes(buf, hook_offset, branch, "dev log hook")
     return 1
-
-
-def encode_add_imm_lsl12(rd: int, rn: int, imm12: int) -> bytes:
-    """Encodes ``add x<rd>, x<rn>, #imm12, lsl #12``."""
-    if not 0 <= imm12 < 0x1000:
-        raise ValueError(f"add lsl12 immediate out of range: {imm12}")
-    return struct.pack("<I", 0x91400000 | (imm12 << 10) | (rn << 5) | rd)
-
-
-def encode_mov_x(rd: int, rm: int) -> bytes:
-    """Encodes ``mov x<rd>, x<rm>`` (ORR with the zero register)."""
-    return struct.pack("<I", 0xAA0003E0 | (rm << 16) | rd)
-
-
-def encode_stur_q(rt: int, rn: int, imm9: int) -> bytes:
-    """Encodes ``stur q<rt>, [x<rn>, #imm9]`` (unscaled, any 16-byte multiple)."""
-    return struct.pack("<I", 0x3C800000 | ((imm9 & 0x1FF) << 12) | (rn << 5) | rt)
-
-
-def encode_ldur_q(rt: int, rn: int, imm9: int) -> bytes:
-    """Encodes ``ldur q<rt>, [x<rn>, #imm9]`` (unscaled, any 16-byte multiple)."""
-    return struct.pack("<I", 0x3CC00000 | ((imm9 & 0x1FF) << 12) | (rn << 5) | rt)
 
 
 GUILD_RAID_SELF_ROW_OFFSET = 0x176A0  # self mirror row inside the global roster
@@ -4539,10 +4506,21 @@ def apply_lan_redirect(
     struct.pack_into("<H", shim_buf, 18, 1 if force_english else 0)
     struct.pack_into("<I", shim_buf, 20, 0)
     target_shim = bytes(shim_buf)
+    cur_shim_region = bytes(buf[shim_off : shim_off + SHIM_MAX_BYTES])
     shim_already = (
         len(buf) >= shim_off + len(target_shim)
         and bytes(buf[shim_off:shim_off + len(target_shim)]) == target_shim
     )
+    shim_has_magic = (
+        len(cur_shim_region) >= 12
+        and struct.unpack_from("<I", cur_shim_region, 8)[0] == SHIM_MAGIC
+    )
+    if (
+        not shim_has_magic
+        and hashlib.sha256(cur_shim_region).hexdigest()
+        != "db5fc0ca3a016eccfd63aa5bb6d615542bf4f545a4cfdb1f9667c5a1050cee4f"
+    ):
+        raise ValueError("Unexpected original bytes in LAN shim cave")
 
     replacements = {
         0xAAD9F8: encode_arm64_branch(0xAAD9F8, SHIM_VADDR + 4, link=False),
@@ -4557,9 +4535,13 @@ def apply_lan_redirect(
         current = bytes(buf[offset:offset + len(replacement)])
         original = LAN_SITE_ORIGINALS[address]
         if address == 0xAA6D70:
-            if current[:4] not in (original, replacement[:4]):
+            if (
+                current != replacement
+                and hashlib.sha256(current).hexdigest()
+                != "ed33fc6a53039057dbccecc30203f9c1c0d7d7fa86adeba7affcef8ef33a509d"
+            ):
                 raise ValueError(
-                    f"Unexpected instruction at LAN site 0x{address:x}: {current[:4].hex()} "
+                    f"Unexpected bytes at LAN loopback stub 0x{address:x}: {current[:4].hex()} "
                     f"(expected {original.hex()} or {replacement[:4].hex()})"
                 )
         elif current not in (original, replacement):
@@ -5289,7 +5271,8 @@ def _single_gem_fang_cave_bytes() -> bytes:
     code += encode_add_sp(0x30)
     code += encode_ldp_sp(22, 21, 0x40)  # original instruction at the hook site
     code += encode_arm64_branch(cave + len(code), SINGLE_GEM_FANG_INSTALL_RETURN)
-    assert len(code) == 0x44, len(code)
+    if len(code) != 0x44:
+        raise RuntimeError(f"single_gem_fang cave size mismatch: {len(code)}")
     code += SINGLE_GEM_FANG_CLIENT_ORIGINAL
     code += encode_arm64_branch(SINGLE_GEM_FANG_CLIENT_SITE, 0x1DCAD7C)
     return bytes(code)
@@ -5328,7 +5311,8 @@ def _single_gem_fang_all_holes_cave_bytes() -> bytes:
     code += bytes.fromhex("f35341a9")  # ldp x19, x20, [sp, #0x10]
     code += bytes.fromhex("fd7bc3a8")  # ldp x29, x30, [sp], #0x30
     code += bytes.fromhex("c0035fd6")  # ret
-    assert len(code) == SINGLE_GEM_FANG_ALL_HOLES_CAVE_SIZE, len(code)
+    if len(code) != SINGLE_GEM_FANG_ALL_HOLES_CAVE_SIZE:
+        raise RuntimeError(f"single_gem_fang_all_holes cave size mismatch: {len(code)}")
     return bytes(code)
 
 
@@ -5358,7 +5342,8 @@ def _single_mod_stone_cave_bytes() -> bytes:
     code += encode_add_sp(0x30)
     code += encode_ldp_sp(24, 23, 0x30)  # original instruction at the hook site
     code += encode_arm64_branch(cave + len(code), SINGLE_MOD_STONE_INSTALL_RETURN)
-    assert len(code) == 0x44, len(code)
+    if len(code) != 0x44:
+        raise RuntimeError(f"single_mod_stone cave size mismatch: {len(code)}")
     code += SINGLE_MOD_STONE_CLIENT_ORIGINAL
     code += SINGLE_MOD_STONE_CLIENT_REPLACEMENT
     return bytes(code)
@@ -6432,7 +6417,8 @@ def _hero_exp_cap_cave_bytes() -> bytes:
     code += bytes.fromhex("f35341a9")  # ldp x19, x20, [sp, #0x10]
     code += bytes.fromhex("fd7bc3a8")  # ldp x29, x30, [sp], #0x30
     code += bytes.fromhex("c0035fd6")  # ret
-    assert len(code) == HERO_EXP_CAP_HELPER_SIZE, len(code)
+    if len(code) != HERO_EXP_CAP_HELPER_SIZE:
+        raise RuntimeError(f"hero_exp_cap helper size mismatch: {len(code)}")
 
     # Trampoline 1 (0x80963C stage clear/sweep): x26 = clamp(x19, x20 + x26)
     t1_start = len(code)
@@ -6440,7 +6426,8 @@ def _hero_exp_cap_cave_bytes() -> bytes:
     code += bytes.fromhex("81021a8be00313aa")  # add x1, x20, x26 ; mov x0, x19
     code += encode_arm64_branch(cave + len(code), cave, link=True)
     code += bytes.fromhex("fa0300aafd7bc1a8c0035fd6")  # mov x26, x0 ; ldp ; ret
-    assert len(code) - t1_start == HERO_EXP_CAP_TRAMPOLINE_STD_SIZE
+    if len(code) - t1_start != HERO_EXP_CAP_TRAMPOLINE_STD_SIZE:
+        raise RuntimeError("hero_exp_cap trampoline 1 size mismatch")
 
     # Trampoline 2 (0x81831C Tower of Dawn): x28 = clamp(x19, x23 + x24)
     t2_start = len(code)
@@ -6448,7 +6435,8 @@ def _hero_exp_cap_cave_bytes() -> bytes:
     code += bytes.fromhex("e102188be00313aa")  # add x1, x23, x24 ; mov x0, x19
     code += encode_arm64_branch(cave + len(code), cave, link=True)
     code += bytes.fromhex("fc0300aafd7bc1a8c0035fd6")  # mov x28, x0 ; ldp ; ret
-    assert len(code) - t2_start == HERO_EXP_CAP_TRAMPOLINE_STD_SIZE
+    if len(code) - t2_start != HERO_EXP_CAP_TRAMPOLINE_STD_SIZE:
+        raise RuntimeError("hero_exp_cap trampoline 2 size mismatch")
 
     # Trampoline 3 (0x945E30 Expedition): x25 = clamp(x24, x0 + x9), preserving x8
     t3_start = len(code)
@@ -6456,8 +6444,10 @@ def _hero_exp_cap_cave_bytes() -> bytes:
     code += bytes.fromhex("0100098be00318aa")  # add x1, x0, x9 ; mov x0, x24
     code += encode_arm64_branch(cave + len(code), cave, link=True)
     code += bytes.fromhex("f90300aae80b40f9fd7bc2a8c0035fd6")  # mov x25, x0 ; ldr x8 ; ldp ; ret
-    assert len(code) - t3_start == HERO_EXP_CAP_EXPEDITION_SIZE
-    assert len(code) == HERO_EXP_CAP_CAVE_SIZE, len(code)
+    if len(code) - t3_start != HERO_EXP_CAP_EXPEDITION_SIZE:
+        raise RuntimeError("hero_exp_cap expedition trampoline size mismatch")
+    if len(code) != HERO_EXP_CAP_CAVE_SIZE:
+        raise RuntimeError(f"hero_exp_cap cave size mismatch: {len(code)}")
     return bytes(code)
 
 
@@ -6670,7 +6660,8 @@ def _rune_upgrade_cave_bytes() -> bytes:
     code += encode_add_sp(0x30)
     code += encode_ldp_sp(26, 25, 0x20)  # original instruction at the hook site
     code += encode_arm64_branch(cave + len(code), RUNE_UPGRADE_INSTALL_RETURN)
-    assert len(code) == 0x44, len(code)
+    if len(code) != 0x44:
+        raise RuntimeError(f"rune_upgrade_client cave size mismatch: {len(code)}")
     code += RUNE_UPGRADE_CLIENT_ORIGINAL
     code += RUNE_UPGRADE_CLIENT_REPLACEMENT
     return bytes(code)
@@ -7826,7 +7817,9 @@ def apply_all_patches(
     if options.single_black_hammer:
         record("single_black_hammer", apply_single_black_hammer(so_buf))
     elif options.equipment_tier_upgrades:
-        apply_single_black_hammer(so_buf)
+        prereq = apply_single_black_hammer(so_buf)
+        if prereq not in (0, EXPECTED_PATCH_COUNTS["single_black_hammer"]):
+            raise ValueError(f"Unexpected prerequisite single_black_hammer count: {prereq}")
 
     if options.single_gem_fang:
         record("single_gem_fang", apply_single_gem_fang(so_buf))
@@ -7834,7 +7827,9 @@ def apply_all_patches(
     if options.upgrade_no_fail_above_20:
         record("upgrade_no_fail_above_20", apply_high_upgrade_no_fail(so_buf))
     elif options.equipment_tier_upgrades:
-        apply_high_upgrade_no_fail(so_buf)
+        prereq = apply_high_upgrade_no_fail(so_buf)
+        if prereq not in (0, EXPECTED_PATCH_COUNTS["upgrade_no_fail_above_20"]):
+            raise ValueError(f"Unexpected prerequisite upgrade_no_fail_above_20 count: {prereq}")
 
     if options.equipment_tier_upgrades:
         record("equipment_tier_upgrades", apply_equipment_tiers(so_buf, seg_offset))

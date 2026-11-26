@@ -58,6 +58,10 @@ def _patch_gate(data: bytes) -> bytes:
 
 def main() -> int:
     """Create a DEV-identified, uninstalled, client-gate-only lab APK."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.parse_args()
     fwt_patcher._load_env_file()
     output = f"output/FWT-Reborn-Alex-Awake-Gate-{APP_VERSION}-dev.apk"
     args = fwt_patcher.build_parser().parse_args(

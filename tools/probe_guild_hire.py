@@ -48,9 +48,17 @@ PORT = 8010
 MEMBER_HIRE = {"friend_crs_idx": 99000062, "friend_idx": 9900006}
 
 
+def _adb_bin() -> str:
+    from core.apk_tooling import locate_tools
+
+    return locate_tools().adb or "adb"
+
+
 def _adb(device: str, command: str, timeout: int = 90) -> str:
+    if device.startswith("-"):
+        raise ValueError(f"invalid adb device serial: {device!r}")
     result = subprocess.run(
-        ["adb", "-s", device, "shell", command],
+        [_adb_bin(), "-s", device, "shell", command],
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -83,7 +91,7 @@ def _post(device: str, body: str, resp_remote: str) -> bytes:
     b64 = base64.b64encode(request.encode()).decode()
     _adb(device, f"echo {b64} | base64 -d | nc 127.0.0.1 {PORT} > {resp_remote}")
     raw = subprocess.run(
-        ["adb", "-s", device, "shell", f"cat {resp_remote}"],
+        [_adb_bin(), "-s", device, "exec-out", "cat", resp_remote],
         capture_output=True,
         timeout=90,
         check=False,

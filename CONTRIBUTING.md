@@ -56,7 +56,7 @@ Run all checks inside `.venv` after your final edit:
 python -m compileall -q core gui tools tests fwt_patcher.py
 ruff check .
 mypy core gui fwt_patcher.py tools tests
-pytest -q -m "not integration"
+pytest -q -m "not integration and not slow" --cov=core
 ```
 
 *(Integration tests marked `@pytest.mark.integration` require a locally supplied authorized reference APK under `source/` and datatable credentials in `.env`; CI skips them automatically when `source/` is absent.)*

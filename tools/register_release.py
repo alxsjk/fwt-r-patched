@@ -79,10 +79,14 @@ def render(entries: list[dict[str, Any]]) -> str:
         "| # | date | version | kind | features | sha256 | bytes | file |",
         "| - | ---- | ------- | ---- | -------- | ------ | ----- | ---- |",
     ]
+    def _md_cell(value: str) -> str:
+        return value.replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
     for i, entry in enumerate(entries, 1):
-        features = ", ".join(entry.get("features") or []) or "-"
+        features = _md_cell(", ".join(entry.get("features") or []) or "-")
+        version = _md_cell(str(entry["version"]))
         lines.append(
-            f"| {i} | {entry['date']} | {entry['version']} | {entry['kind']} | {features} "
+            f"| {i} | {entry['date']} | {version} | {entry['kind']} | {features} "
             f"| `{entry['sha256'][:16]}` | {entry['bytes']} | `{entry['file']}` |"
         )
     lines.append("")
@@ -107,8 +111,8 @@ def main() -> None:
     parser.add_argument("--version", default="")
     args = parser.parse_args()
 
-    apk = Path(args.apk)
-    if not apk.is_absolute():
+    apk = Path(args.apk).expanduser()
+    if not apk.is_absolute() and not apk.exists():
         apk = ROOT / apk
     if not apk.exists():
         raise SystemExit(f"APK not found: {apk}")
@@ -137,8 +141,12 @@ def main() -> None:
     }
     entries.append(entry)
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    REGISTRY.write_text(json.dumps({"releases": entries}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    TABLE.write_text(render(entries), encoding="utf-8")
+    reg_tmp = REGISTRY.with_name(REGISTRY.name + ".tmp")
+    tbl_tmp = TABLE.with_name(TABLE.name + ".tmp")
+    reg_tmp.write_text(json.dumps({"releases": entries}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    reg_tmp.replace(REGISTRY)
+    tbl_tmp.write_text(render(entries), encoding="utf-8")
+    tbl_tmp.replace(TABLE)
     print(f"registered: {entry['version']} ({entry['kind']}) sha256={digest[:16]}")
 
 

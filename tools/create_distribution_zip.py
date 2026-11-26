@@ -106,6 +106,7 @@ def build_suite_zip(
     output_path: Path,
     include_patched_apk: bool = False,
 ) -> None:
+    _refuse_dev_build(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     patched_apk = default_patched_apk_path()
     if include_patched_apk and not patched_apk.is_file():
@@ -218,7 +219,14 @@ def stage_apk_only(output_path: Path) -> None:
 
     if output_path.resolve() != patched_apk.resolve():
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(patched_apk, output_path)
+        tmp_out = output_path.with_name(output_path.name + ".tmp")
+        tmp_out.unlink(missing_ok=True)
+        try:
+            shutil.copy2(patched_apk, tmp_out)
+            tmp_out.replace(output_path)
+        except Exception:
+            tmp_out.unlink(missing_ok=True)
+            raise
     size_mb = output_path.stat().st_size / (1024 * 1024)
     print(f"[SUCCESS] Standalone APK ready: {output_path} ({size_mb:.2f} MiB)\n")
 

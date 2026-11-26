@@ -15,6 +15,7 @@ Run this checklist before tagging a release, building distribution archives, or 
 1. Confirm `APP_VERSION` and `APP_RELEASE_DATE` in `core/version.py` match:
    - `[project].version` in `pyproject.toml`
    - `README.md` header and versioned filename examples
+   - `docs/FEATURE_CATALOG.md` header
    - Top released section in `CHANGELOG.md` (with `## [Unreleased]` present above it)
 2. Run `pytest -q tests/test_version.py tests/test_suite_health.py`.
 
@@ -30,7 +31,7 @@ Run this checklist before tagging a release, building distribution archives, or 
 
 ## 3. GitHub Authorial Governance & CI Integrity
 
-1. Verify `.github/CODEOWNERS`, `.github/workflows/ci.yml`, `.github/workflows/pr-policy.yml`, `.github/workflows/pr-policy-comment.yml`, `.github/workflows/issue-triage.yml`, issue/PR templates, and `CONTRIBUTING.md` stay synchronized.
+1. Verify `.github/CODEOWNERS`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `.github/workflows/pr-policy.yml`, `.github/workflows/pr-policy-comment.yml`, `.github/workflows/issue-triage.yml`, issue/PR templates, and `CONTRIBUTING.md` stay synchronized.
 2. Run `pytest -q tests/test_github_workflows.py` to enforce fork-safety invariants (no `actions/checkout` on `pull_request_target`/`issues`, env-var input passing, no job-level `if:` on `PR Policy (Approved Issue)`).
 3. Never commit or modify Spec Kit manifest-tracked files under `.specify/scripts/`, `.specify/templates/`, or `.agents/skills/speckit-*`.
 
@@ -40,6 +41,6 @@ Run this checklist before tagging a release, building distribution archives, or 
 2. Run all verification gates after the final edit:
    - `python -m compileall -q core gui tools tests fwt_patcher.py`
    - `ruff check .`
-   - `mypy core gui fwt_patcher.py tools tests` (when installed)
-   - `pytest -q -m "not integration"` (and `pytest -q` when `source/` reference APK is available)
+   - `mypy core gui fwt_patcher.py tools tests`
+   - `pytest -q -m "not integration and not slow" --cov=core` (and `pytest -q` when `source/` reference APK is available)
    - Ensure `git status --short` contains no `.coverage` or temporary artifacts before committing.

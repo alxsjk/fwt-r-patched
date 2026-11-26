@@ -41,7 +41,6 @@ ALEX_PASSIVE_CRIT_DMG_DOWN_EFFECT = 26742786
 IAN_COOP_EFFECT_ID = 23531665
 
 # Donor IDs present across all 8 localized skilleffecttable*.unity3d bundles
-DONOR_ATK_RATE_DOWN_EFFECT = 23072800
 DONOR_DR_DOWN_RATE_EFFECT = 36835330  # DRDownRate (type 132), vt=2, precon 255, icon D_SkillIcon_33
 DONOR_COOP_UTILITY_EFFECT = 23531665
 DONOR_PASSIVE_FINAL_POWER_BUFF = 23662625
@@ -493,9 +492,14 @@ def prepare_alex_rebalance_assets(
             return existing_replacements[path]
         return archive.read(path)
 
-    # Include Awake Thornbush effects when Destiny Lance (0x100185) is present.
-    probe_skills = _read_rows(read_bundle(skill_paths[0]))
-    include_awake = any(row.get("_skillId") == ALEX_AWAKE_SKILL_ID for row in probe_skills)
+    # Include Awake Thornbush effects when Destiny Lance (0x100185) is present across all locales.
+    awake_presence = {
+        any(row.get("_skillId") == ALEX_AWAKE_SKILL_ID for row in _read_rows(read_bundle(p)))
+        for p in skill_paths
+    }
+    if len(awake_presence) != 1:
+        raise ValueError("Inconsistent Alex Awakening skill presence across localized skilldata tables")
+    include_awake = next(iter(awake_presence))
 
     result: dict[str, bytes] = {}
     for path in effect_paths:

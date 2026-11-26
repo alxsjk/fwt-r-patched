@@ -94,7 +94,7 @@ def dungeon_recom_info_state(
 ) -> str:
     """Return 'stock', 'patched', or raise ValueError on mixed/unexpected bytes."""
     if offset is None:
-        offset = partial(translate_vaddr, read_load_segments(bytes(data)))
+        offset = partial(translate_vaddr, read_load_segments(data))
     states: list[str] = []
     for addr, original, target in HOOKS:
         off = offset(addr)
@@ -126,7 +126,7 @@ def apply_dungeon_recom_info(
 ) -> int:
     """Install the DUNGEON_RECOM_INFO handler cave."""
     if offset is None:
-        offset = partial(translate_vaddr, read_load_segments(bytes(buf)))
+        offset = partial(translate_vaddr, read_load_segments(buf))
     state = dungeon_recom_info_state(buf, offset)
     if state == "patched":
         return 0

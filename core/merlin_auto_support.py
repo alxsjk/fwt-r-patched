@@ -261,7 +261,7 @@ def merlin_auto_support_state(
 ) -> str:
     """Return 'stock', 'patched', or raise ValueError on mixed/unexpected bytes."""
     if offset is None:
-        offset = partial(translate_vaddr, read_load_segments(bytes(data)))
+        offset = partial(translate_vaddr, read_load_segments(data))
     states: list[str] = []
     for addr, original, target in HOOKS:
         off = offset(addr)
@@ -293,7 +293,7 @@ def apply_merlin_auto_support(
 ) -> int:
     """Install the Merlin Slot-1 Auto Support post-Covault client hook cave."""
     if offset is None:
-        offset = partial(translate_vaddr, read_load_segments(bytes(buf)))
+        offset = partial(translate_vaddr, read_load_segments(buf))
     state = merlin_auto_support_state(buf, offset)
     if state == "patched":
         return 0

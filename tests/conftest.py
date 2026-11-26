@@ -102,6 +102,8 @@ def _hermetic_fwt_env(request: pytest.FixtureRequest, monkeypatch: pytest.Monkey
         "FWT_KEYSTORE",
         "FWT_KEYSTORE_PASS",
         "FWT_KEY_ALIAS",
+        "FWT_APKTOOL_JAR",
+        "FWT_IL2CPP_CODE_BIN",
         *_DATATABLE_ENV_VARS,
     ):
         monkeypatch.delenv(name, raising=False)

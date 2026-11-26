@@ -372,9 +372,11 @@ def main(argv: list[str] | None = None) -> int:
         if allowed_cmds:
             records = _filter_records_by_command(records, allowed_cmds)
     if not records:
+        from core.version import APP_VERSION
+
         print(
-            "no dev-build lines found. Check the capture with: adb logcat -v time "
-            "-s FWTR-DEV-v2.5.26:V",
+            f"no dev-build lines found. Check the capture with: adb logcat -v time "
+            f"-s FWTR-DEV-v{APP_VERSION}:V",
             file=sys.stderr,
         )
         return 1

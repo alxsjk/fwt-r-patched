@@ -1,8 +1,6 @@
 """Checks for the experimental complete costume package patch."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from core.costume_packages import CAVES, HOOKS, apply_costume_packages, inspect_costume_packages
@@ -10,11 +8,8 @@ from core.elf_mapping import read_load_segments, translate_vaddr
 
 
 @pytest.fixture
-def reference() -> bytearray:
-    path = Path(__file__).resolve().parent.parent / "output/costume-124-original-lab.so"
-    if not path.exists():
-        pytest.skip("isolated emulator lab library not available")
-    return bytearray(path.read_bytes())
+def reference(reference_buffers: tuple[bytes, bytes]) -> bytearray:
+    return bytearray(reference_buffers[0])
 
 
 def _offset(buf: bytearray):

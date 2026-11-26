@@ -59,20 +59,28 @@ def test_all_workflows_declare_permissions_and_follow_fork_safety_invariants() -
         "pr-policy.yml",
         "pr-policy-comment.yml",
         "issue-triage.yml",
+        "release.yml",
     }
 
-    dangerous_expr = re.compile(
-        r"\$\{\{\s*github\.event\.(?:pull_request|issue)\.(?:body|title|head\.ref)"
-    )
+    uses_pattern = re.compile(r"uses:\s*([^\s#]+)")
     for wf in workflows:
         text = wf.read_text(encoding="utf-8")
         assert re.search(r"(?m)^permissions:(?:\s*\{\}|\s*$)", text), f"{wf.name} must declare permissions:"
+        for match in uses_pattern.finditer(text):
+            ref = match.group(1)
+            assert re.search(r"@[0-9a-f]{40}$", ref), f"{wf.name} must pin action by commit SHA: {ref}"
         if wf.name in {"pr-policy-comment.yml", "issue-triage.yml"}:
             assert "actions/checkout" not in text, f"{wf.name} must never checkout code"
-            # Untrusted fields may appear only inside `env:` mappings, never inline inside `run:`.
-            run_section = text.split("run: |", 1)[1]
-            assert not dangerous_expr.search(run_section), (
-                f"{wf.name} must not interpolate untrusted event strings into run:"
+        for run_block in re.split(r"(?m)^\s*run:\s*\|?\s*\n", text)[1:]:
+            # Check indented script lines up to the next YAML step key.
+            script_lines = []
+            for line in run_block.splitlines():
+                if line and not line.startswith(" " * 8):
+                    break
+                script_lines.append(line)
+            script = "\n".join(script_lines)
+            assert "${{" not in script, (
+                f"{wf.name} must pass GitHub expressions through env:, not inline in run:"
             )
 
     pr_policy = (WORKFLOWS_DIR / "pr-policy.yml").read_text(encoding="utf-8")

@@ -284,23 +284,29 @@ class FilePathPicker(tk.Frame):
     def _browse(self):
         from tkinter import filedialog
         current = self.var.get().strip()
-        initial_path = Path(current) if current else None
-        initialdir = str(initial_path.parent) if initial_path and initial_path.parent else None
+        initial_path = Path(current).expanduser() if current else None
+        initialdir = (
+            str(initial_path.parent)
+            if initial_path and initial_path.parent.is_dir()
+            else None
+        )
         initialfile = initial_path.name if initial_path else None
         if self.is_save:
             path = filedialog.asksaveasfilename(
-                title="Select Output APK",
+                title="Select Output File",
                 filetypes=self.file_types,
                 initialdir=initialdir,
                 initialfile=initialfile,
+                parent=self.winfo_toplevel(),
             )
-            if path and not path.lower().endswith(".apk"):
+            if path and any("*.apk" in pat for _, pat in self.file_types) and not path.lower().endswith(".apk"):
                 path += ".apk"
         else:
             path = filedialog.askopenfilename(
-                title="Select Base APK",
+                title="Select Input File",
                 filetypes=self.file_types,
                 initialdir=initialdir,
+                parent=self.winfo_toplevel(),
             )
         if path:
             self.var.set(path)

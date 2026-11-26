@@ -41,10 +41,12 @@ _RANGES = {
 
 
 def inspect(adb: str, serial: str) -> None:
+    if serial.startswith("-"):
+        raise ValueError(f"invalid adb serial: {serial!r}")
     prefix = [adb, "-s", serial]
 
     def output(*args: str) -> bytes:
-        return subprocess.run([*prefix, *args], check=True, capture_output=True).stdout
+        return subprocess.run([*prefix, *args], check=True, capture_output=True, timeout=30).stdout
 
     pids = output("shell", "pidof", "com.nexon.fwar").decode().split()
     probes: list[str] = []
@@ -118,8 +120,10 @@ def inspect(adb: str, serial: str) -> None:
 
 
 if __name__ == "__main__":
+    from core.apk_tooling import locate_tools
+
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--adb", default="adb")
+    parser.add_argument("--adb", default=locate_tools().adb or "adb")
     parser.add_argument("--serial", required=True)
     args = parser.parse_args()
     inspect(args.adb, args.serial)

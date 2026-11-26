@@ -15,7 +15,7 @@ Run inside the project virtualenv before requesting review:
 - [ ] `python -m compileall -q core gui tools tests fwt_patcher.py`
 - [ ] `ruff check .`
 - [ ] `mypy core gui fwt_patcher.py tools tests`
-- [ ] `pytest -q -m "not integration"`
+- [ ] `pytest -q -m "not integration and not slow" --cov=core`
 - [ ] Updated `docs/FEATURE_CATALOG.md`, `gui/feature_catalog.py`, `gui/main_window.py`, `core/patch_inspector.py`, and `tests/test_gui_feature_parity.py` (if patch options changed)
 
 ## Policy & Hygiene Checklist

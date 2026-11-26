@@ -13,7 +13,7 @@ Follow this workflow whenever implementing or changing a gameplay feature or bug
 ## Before Editing
 
 1. Read `docs/PATCH_SPEC.md`, `docs/CODE_CAVES.md`, and `docs/FEATURE_CATALOG.md`.
-2. Verify whether an existing module under `core/` owns the feature (`core_patches.py`, `alex_awakening*.py`, `alex_rebalance.py`, `costume_packages*.py`, `equipment_tier_upgrades.py`, `guild_raid_*.py`, `hero_shop_offers.py`, `mythical_shop.py`, `dex_smali.py`, or `axml.py`).
+2. Verify whether an existing module under `core/` owns the feature (`core_patches.py`, `alex_awakening*.py`, `alex_heros_mark.py`, `alex_rebalance.py`, `convert_hex_guard.py`, `costume_package*.py`, `dungeon_recom_info.py`, `equipment_tier_upgrades.py`, `guild_raid_*.py`, `hero_shop_offers.py`, `merlin_auto_support.py`, `mythical_shop.py`, `surprise_transcendence_package.py`, `dex_smali.py`, or `axml.py`).
 
 ## Implementation Checklist
 
@@ -46,6 +46,6 @@ Run using the project virtualenv (`.\.venv\Scripts\python.exe` or `.venv/bin/pyt
 
 1. `python -m compileall -q core gui tools tests fwt_patcher.py`
 2. `ruff check .`
-3. `mypy core gui fwt_patcher.py tools tests` (when mypy is installed)
+3. `mypy core gui fwt_patcher.py tools tests`
 4. `pytest -q tests/test_gui_feature_parity.py tests/test_suite_health.py`
-5. `pytest -q -m "not integration"` (and `pytest -q` when `source/fwt_0.682_offline_v1574.apk` is available)
+5. `pytest -q -m "not integration and not slow" --cov=core` (and `pytest -q` when `source/fwt_0.682_offline_v1574.apk` is available)

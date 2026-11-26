@@ -341,12 +341,12 @@ def patch_version_name(manifest: bytes, suffix: str) -> tuple[bytes, str, str]:
     """Appends ``suffix`` to ``android:versionName``.
 
     Returns ``(patched_manifest, old_value, new_value)``.  The string is added to
-    the pool, so every chunk after it shifts by four bytes; the XML chunk size is
-    updated to match.  ``versionName`` lives on ``<manifest>``, not
+    the pool, shifting subsequent chunks by the pool size delta; the XML chunk size
+    is updated to match.  ``versionName`` lives on ``<manifest>``, not
     ``<application>``.
     """
     document = AxmlDocument(manifest)
-    attribute = _find_attribute(document, "versionName", ATTR_VERSION_NAME_ID)
+    attribute = document.element("manifest").attribute("versionName", ATTR_VERSION_NAME_ID)
     if attribute.data_type != TYPE_STRING:
         raise ValueError(
             "android:versionName is not a literal string "
@@ -356,7 +356,7 @@ def patch_version_name(manifest: bytes, suffix: str) -> tuple[bytes, str, str]:
     if current.endswith(suffix):
         return manifest, current, current
     updated, new_index = document.append_string(current + suffix)
-    attr = _find_attribute(AxmlDocument(updated), "versionName", ATTR_VERSION_NAME_ID)
+    attr = AxmlDocument(updated).element("manifest").attribute("versionName", ATTR_VERSION_NAME_ID)
     patched = bytearray(updated)
     struct.pack_into("<I", patched, attr.raw_value_offset, new_index)
     struct.pack_into("<I", patched, attr.data_offset, new_index)
@@ -371,7 +371,7 @@ def _find_attribute(
         for attribute in element.attributes:
             if resource_id is not None and attribute.resource_id == resource_id:
                 return attribute
-            if resource_id is None and attribute.name == name:
+            if attribute.name == name:
                 return attribute
     raise ValueError(f"No {name!r} attribute found in the manifest")
 

@@ -91,32 +91,56 @@ def offset_to_vaddr(offset: int, segments: list[tuple[int, int, int]]) -> int | 
 
 
 def load_symbols(lib: str | Path) -> tuple[dict[int, str], list[tuple[int, int]], list[int]]:
-    """Load defined symbols from ``lib`` using ``nm`` without a shell."""
-    out = subprocess.run(
-        ["nm", "-C", "-S", "--defined-only", "--", str(lib)],
-        shell=False,
-        capture_output=True,
-        text=True,
-        check=False,
-    ).stdout
+    """Load defined symbols from ``lib`` using ``nm``, falling back to ``pyelftools``."""
+    import shutil
+
     names: dict[int, str] = {}
     spans: list[tuple[int, int]] = []
-    for line in out.splitlines():
-        parts = line.split()
-        if len(parts) < 4:
-            continue
-        try:
-            start, size = int(parts[0], 16), int(parts[1], 16)
-        except ValueError:
-            continue
-        names[start] = " ".join(parts[3:]).replace("(anonymous namespace)::", "")
-        spans.append((start, size))
+    if shutil.which("nm"):
+        out = subprocess.run(
+            ["nm", "-C", "-S", "--defined-only", "--", str(lib)],
+            shell=False,
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            try:
+                start, size = int(parts[0], 16), int(parts[1], 16)
+            except ValueError:
+                continue
+            names[start] = " ".join(parts[3:]).replace("(anonymous namespace)::", "")
+            spans.append((start, size))
+    else:
+        from elftools.elf.elffile import ELFFile
+        from elftools.elf.sections import SymbolTableSection
+
+        with open(lib, "rb") as fh:
+            elf = ELFFile(fh)
+            for section in elf.iter_sections():
+                if not isinstance(section, SymbolTableSection):
+                    continue
+                for sym in section.iter_symbols():
+                    start = int(sym["st_value"])
+                    size = int(sym["st_size"])
+                    if start and sym.name:
+                        names[start] = sym.name
+                        spans.append((start, size))
     spans.sort()
     return names, spans, [s for s, _ in spans]
 
 
 def main() -> None:
-    start = int(sys.argv[1], 0)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Disassemble one ARM64 function from libfwt_local_server.so")
+    parser.add_argument("address", help="Function virtual address (hex or decimal)")
+    parser.add_argument("outfile", nargs="?", type=Path, help="Optional output file path")
+    args = parser.parse_args()
+    start = int(args.address, 0)
     with open(LIB, "rb") as handle:
         blob = handle.read()
     names, spans, starts = load_symbols(LIB)
@@ -149,6 +173,7 @@ def main() -> None:
     code_offset = file_offset(start, segments)
     if code_offset is None:
         raise SystemExit(f"0x{start:x} is outside segments mapped in the file")
+    lines_out: list[str] = []
     for ins in md.disasm(blob[code_offset : code_offset + size], start):
         note = ""
         if ins.mnemonic == "adrp":
@@ -167,7 +192,13 @@ def main() -> None:
         elif ins.mnemonic in ("bl", "b"):
             with contextlib.suppress(ValueError):
                 note = f"  ; {symbol_at(int(ins.op_str.lstrip('#'), 0))}"
-        print(f"0x{ins.address:x}: {ins.mnemonic:7s} {ins.op_str}{note}")
+        lines_out.append(f"0x{ins.address:x}: {ins.mnemonic:7s} {ins.op_str}{note}")
+    rendered = "\n".join(lines_out) + ("\n" if lines_out else "")
+    if args.outfile:
+        args.outfile.parent.mkdir(parents=True, exist_ok=True)
+        args.outfile.write_text(rendered, encoding="utf-8")
+    else:
+        sys.stdout.write(rendered)
 
 
 if __name__ == "__main__":

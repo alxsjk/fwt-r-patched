@@ -67,16 +67,16 @@ Every cave below is checked for non-overlap by `validate_cave_layout()` in
 | `0xB2AB00..0xB2ABC0` | 192 B | same | `wb_daily_kraken` (`mode_drops_x10`, fixed 500 Kraken Scales per Unknown Paradise attack) |
 | `0xB2ABC0..0xB2ACFC` | 316 B | same | `guild_raid_fire_support` (07.06: post-Covault installer `0xAB335C` -> minion-presence gate at `0x018E7060`) |
 | `0xB2AD10..0xB2AD68` | 88 B | same | `single_gem_fang` (05.05: unlock holes 1..3 via `0x8ADE80` -> `update_equipment_hole_json`) |
-| `0xB2AD70..0xB2AE18` | 168 B | same | `hero_exp_cap` (08.06: EXP clamp helper + stage/Tower/expedition trampolines; `0xB2AE8C..0xB2B098` free tail) |
+| `0xB2AD70..0xB2AE18` | 168 B | same | `hero_exp_cap` (08.06: EXP clamp helper + stage/Tower/expedition trampolines) |
 | `0xB2AE18..0xB2AFC0` | 424 B | same | `guild_raid_protection_persist` (07.09: mid-function installer at `0xAB32F4` patching `UseDamageReduceEffect` `0x1877C60` and `GuildSkillEffect::OnEndTurnCamp` `0x1BAA2FC` / `0x1BAA318`, with diagnostic logging and self-healing `mprotect` fallback) |
-| `0xB2AFDC..0xB2B068` | 140 B | same (`0xB29EBC..0xB2B098`) | `alex_heros_mark` (12.03: five 28-byte `fwt_valid_soulgear_idx::kIds` loop-exit stubs served from the post-Covault installer at `0xAB3304`) |
-| `0xB2B098..0xB2B1B4` | 284 B | `itanium_demangle::AbstractManglingParser::parseName` (`0xB2B098..0xB2B750`) | `convert_hex_guard` (08.07 / KB-001: post-Covault installer `0xAB3370` -> `UtilFunc$$ConvertHexU32` `0x0181178C` non-hex guard) |
+| `0xB2AFDC..0xB2B068` | 140 B | same (`0xB29EBC..0xB2B098`; `0xB2B068..0xB2B098` 48 B free tail) | `alex_heros_mark` (12.03: five 28-byte `fwt_valid_soulgear_idx::kIds` loop-exit stubs served from the post-Covault installer at `0xAB3304`) |
+| `0xB2B098..0xB2B1B4` | 284 B | `itanium_demangle::AbstractManglingParser::parseName` (`0xB2B098..0xB2B750`) | `convert_hex_guard` (08.07 / KB-001: post-Covault installer `0xAB3370` -> `UtilFunc$$ConvertHexU32` `0x0181178C` non-hex guard; preserves `x0..x2`) |
 | `0xB2B1B4..0xB2B530` | 892 B | same (`0xB2B098..0xB2B750`) | `merlin_auto_support` (14.01: post-Covault installer `0xAB3300` -> `IsUseSupportSkillState` `0x20EDBCC`/`0x20F1AF0` and `CompareFindTargetStep` `0x20EEF2C`/`0x20F3338`) |
 | `0xB2B530..0xB2B620` | 240 B | same (`0xB2B098..0xB2B750`) | `trait_multi_unique` (13.04: 10-roll batch bitmask wrapper & Pass 1/Pass 2 filter + unconstrained fallback for `REQ_CHANGE_CREATURE_POTENTIAL` / `choose_potential_code_json`) |
 | `0xB2B620..0xB2B650` | 48 B | same (`0xB2B098..0xB2B750`; `0xB2B650..0xB2B750` free tail) | `merlin_auto_support` (14.01: awake-cooldown trampoline — saves `x8`/`x9`/`x10`/`x30`, resolves `IL2CPP_BASE_CACHE`, calls client RVA `0x1606428` `IsAwakeningSkill ? GetCurrentCoolTime : -1`; entered by the 3-word `bl` swap at `0xB2B3CC`) |
-| `0xB301F8..0xB30530` | 832 B | `itanium_demangle::AbstractManglingParser::parseEncoding` (`0xB301F8..0xB3101C`; `0xB30530..0xB3101C` free tail) | `dungeon_recom_info` (08.08: wraps the `handle_json_request` dispatch call `0x7DAED0`, scans the request for `"DUNGEON_RECOM_INFO"`, serves `recom_list` from `friend_list_json`; first 179 instructions are code, the last 116 bytes are cave-embedded literals) |
-| `0xB30538..0xB30990` | 1,112 B | same (`0xB301F8..0xB3101C`; free tail from `0xB30538`) | `merlin_auto_support` (14.02: skills-before-cells — installer reached from the 14.01 installer tail (`ret` at `0xB2B244` -> `b 0xB30538`) installs a fifth 4-word absolute stub at client `0x1A35F68` (`CharactersAI::InitActing`, the `MoveEnableToTile` call site); the body promotes the Awakening rung (stock `IsEnableUsingSkill` + `EnableUseSkillToTarget`) and *Magic infusion* (support branch only) ahead of the cell move. 14.03: `awaken_power` at `0xB3088C`, called from the 14.01 compare body, ranks allies by Awakening-skill damage through `SkillEffectTableManager::GetData` `0x202730C`) |
-| `0xB30990..0xB30B14` | 388 B | same (`0xB301F8..0xB3101C`; free tail `0xB30B14..0xB3101C`) | `guild_raid_skill_turn_gate` (07.10: boot word `0xAB3374` -> per-turn gate at `Player$$ExecuteReservedLordSkill` `0x018E6FF0`; state `{instance, turn, mask}` at `0xBE62C8..0xBE62D8`) |
+| `0xB301F8..0xB30538` | 832 B | `itanium_demangle::AbstractManglingParser::parseEncoding` (`0xB301F8..0xB3101C`) | `dungeon_recom_info` (08.08: wraps the `handle_json_request` dispatch call `0x7DAED0`, scans the request for `"DUNGEON_RECOM_INFO"`, serves `recom_list` from `friend_list_json`; first 179 instructions are code, the last 116 bytes are cave-embedded literals) |
+| `0xB30538..0xB30990` | 1,112 B | same (`0xB301F8..0xB3101C`) | `merlin_auto_support` (14.02 bundled in 14.01: skills-before-cells — installer reached from the 14.01 installer tail (`ret` at `0xB2B244` -> `b 0xB30538`) installs a fifth 4-word absolute stub at client `0x1A35F68` (`CharactersAI::InitActing`, the `MoveEnableToTile` call site); the body promotes the Awakening rung (stock `IsEnableUsingSkill` + `EnableUseSkillToTarget`) and *Magic infusion* (support branch only) ahead of the cell move. 14.03 bundled in 14.01: `awaken_power` at `0xB3088C`, called from the 14.01 compare body, ranks allies by Awakening-skill damage through `SkillEffectTableManager::GetData` `0x202730C`) |
+| `0xB30990..0xB30B24` | 404 B | same (`0xB301F8..0xB3101C`; free tail `0xB30B24..0xB3101C`, 1,272 B) | `guild_raid_skill_turn_gate` (07.10: boot word `0xAB3374` -> per-turn gate at `Player$$ExecuteReservedLordSkill` `0x018E6FF0`; preserves `x0..x3`; state `{instance, turn, mask}` at `0xBE62C8..0xBE62D8`) |
 | `0xB33314..0xB33624` | 784 B | `itanium_demangle::NewExpr::printLeft` (`0xB33314..0xB3384C`) | `campaign_gold` (gold/gene/mana), `recycle_completion_ticket` (+ tail), `event_coin`, `expedition_x10`, `dimension_x10`, `patch_flags`, `guild_raid_client`, `guild_raid_sentinel` |
 | `0xB33634..0xB33724` | 240 B | same (shared exclusive slot) | `battle_arena_save` (`0xB33634..0xB3367C`) + `single_gem_fang_client` (`0xB3367C..0xB336C8`) + `guild_raid_mercenary_client` (`0xB336D8..0xB33724`) |
 | `0xB33724..0xB3384C` | 296 B | same | `campaign_gold` (items at `0xB33734`), `dimension_gene_x10`, `recycle_reward_flag`, `gem_mining_x10`, `honor_points_x2`; `0xB337B4..0xB33800` is the One Modification Stone client cave (0x4C); `0xB33724..0xB33734` (16 B) and `0xB33800..0xB33820` (32 B) are free |
@@ -101,6 +101,9 @@ Every cave below is checked for non-overlap by `validate_cave_layout()` in
 - `0xBE3798` (8 B): cached `libil2cpp.so` base address written by
   `patch_offline_convenience_flow` and read by `battle_arena_save_fix` /
   `guild_raid_mercenary`.
+- `0xBE6268..0xBE62C8` (96 B, `alex_awakening_scratch`): writable runtime
+  scratch allocated by extending the final RW `PT_LOAD` segment's `p_memsz`
+  for `alex_awakening` (`12.01`).
 - `0xBE62C8..0xBE62D8` (16 B, mapped RW page tail right after
   `alex_awakening_scratch`, beyond the last PT_LOAD `p_memsz` and outside
   every symbol): `guild_raid_skill_turn_gate` per-battle state
@@ -132,7 +135,7 @@ Largest `demangler-only` candidates:
 | --- | --- | --- |
 | 4,572 | `0xb29ebc` | `itanium_demangle::AbstractManglingParser<…>::parseEncoding` (family) |
 | 4,372 | `0xb2ea8c` | same family |
-| 3,620 | `0xb301f8` | same family — 832 B now used by `dungeon_recom_info` (08.08) |
+| 3,620 | `0xb301f8` | same family — 2,348 B used by `dungeon_recom_info` (832 B), `merlin_auto_support` (1,112 B), and `guild_raid_skill_turn_gate` (404 B) |
 | 2,700 | `0xb292e8` | same family |
 
 The `lan-mode` list adds the whole embedded HTTP server — `handle_client`

@@ -1,4 +1,6 @@
 * text=auto
 
-# Shell scripts must retain Unix line endings on checkout.
+# Shell scripts and Spec Kit / agent harness files must retain Unix line endings.
 *.sh text eol=lf
+.specify/** text eol=lf
+.agents/** text eol=lf

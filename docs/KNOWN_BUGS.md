@@ -16,7 +16,11 @@ evidence gathered so far, and the recommended workaround until a fix ships.
   in the same session, but the general inventory screen and the costume
   enchant screen show **zero** after closing and reopening the game.
 
-### Workaround
+### Historical Investigation (pre-`2.5.55`, archived)
+
+The notes below document the workaround and investigation steps recorded before `convert_hex_guard` (`08.07`) resolved KB-001 in `2.5.55` (note that the earlier manual test removed `13000Y` but still left `13000K` in the inventory, which continued triggering the `FormatException`).
+
+#### Historical Workaround (2.5.51–2.5.54)
 
 Use the stones in the same session in which you buy them. Within one session
 the client tracks them correctly: costume enchant consumes five stones plus
@@ -60,12 +64,6 @@ to zero until the next in-session purchase or enchant.
   early `item_idx` and removing the corrupted hex-written template rows
   (`1D4C3`, `C`, `13000Y`) from the inventory did not restore the display.
 
-### Suspected area and next lead
+#### Historical Lead (resolved by `08.07`)
 
-The client's `GET_MY_ITEM_INFO` ingestion path discards the stone row (or the
-counter it feeds), while the shop and enchant response handlers update that
-counter directly. The next reverse-engineering lead is the
-`CostumeEnchantPopup` / `EnchantCostumeItem` client path in `libil2cpp.so`
-and `global-metadata.dat`: locate the `GET_MY_ITEM_INFO` handler, compare it
-with the `SHOP_BUY_CONTENTS` / `COSTUME_ENCHANT` handlers, and find which
-in-memory counter the enchant UI reads at scene load.
+The client's `GET_MY_ITEM_INFO` ingestion path was confirmed to abort inside `UtilFunc$$ConvertHexU32` on non-hex starter template rows (`13000K` / `13000Y`), fixed permanently in `2.5.55` by always-on Feature `08.07` (`convert_hex_guard`).

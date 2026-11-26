@@ -1,6 +1,6 @@
 # FWT Re-Patched — Technical Specification of Patches & Tooling
 
-> Living document. Last updated: 2026-11-19.
+> Living document. Last updated: 2026-11-25.
 >
 > Scope: Korean offline APK of Fantasy War Tactics **0.682 v1574**, embedded local
 > server (`libfwt_local_server.so`), IL2CPP client (`libil2cpp.so`), and DEX

@@ -12,6 +12,7 @@ lief==1.0.0
 # Runtime client / IL2CPP instrumentation
 # (keeps websockets 13.1 because frida-tools requires websockets<14)
 frida-tools==14.13.1
+websockets==13.1
 
 # Asset datatable patching (internal flask schedule / honor rewards)
 UnityPy==1.25.4

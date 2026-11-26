@@ -180,6 +180,7 @@ def test_capstone_disassembles_entire_cave_without_gaps() -> None:
     assert any(i.mnemonic == "blr" for i in helper_insns)
 
 
+@pytest.mark.integration
 def test_client_hook_words_match_decrypted_client_image() -> None:
     """Guards the four-word patterns against the real client.
 

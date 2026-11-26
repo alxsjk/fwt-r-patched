@@ -44,14 +44,14 @@ Project-specific skills complement Spec Kit (keep all edits outside the Spec Kit
 
 ## Repository Layout
 
-- `core/`: Deterministic patch engine (`core_patches.py`), APK/zipalign/signing (`apk_tooling.py`), DEX/smali & `apktool` (`dex_smali.py`), feature detector (`patch_inspector.py`), ELF segment mapping (`elf_mapping.py`), manifest AXML (`axml.py`), release metadata (`version.py`), and modular feature patches (`alex_awakening*.py`, `alex_rebalance.py`, `costume_package*.py`, `equipment_tier_upgrades.py`, `guild_raid_*.py`, `hero_shop_offers.py`, `mythical_shop.py`).
+- `core/`: Deterministic patch engine (`core_patches.py`), APK/zipalign/signing (`apk_tooling.py`), DEX/smali & `apktool` (`dex_smali.py`), feature detector (`patch_inspector.py`), ELF segment mapping (`elf_mapping.py`), manifest AXML (`axml.py`), release metadata (`version.py`), and modular feature patches (`alex_awakening*.py`, `alex_heros_mark.py`, `alex_rebalance.py`, `convert_hex_guard.py`, `costume_package*.py`, `dungeon_recom_info.py`, `equipment_tier_upgrades.py`, `guild_raid_*.py`, `hero_shop_offers.py`, `merlin_auto_support.py`, `mythical_shop.py`, `surprise_transcendence_package.py`).
 - `gui/`: Desktop interface (`main_window.py`, `components.py`, `theme.py`) and stable feature grouping/IDs (`feature_catalog.py`).
 - `fwt_patcher.py`: CLI entry point (`fwt-patcher`).
-- `tools/`: Reverse-engineering helpers, ELF/code-cave generators, `.env` cipher extractor (`extract_env_keys.py`), ADB probes, and release packagers (`create_distribution_zip.py`, `register_release.py`).
-- `tests/`: Unit, Keystone/Capstone/Unicorn emulation, GUI parity, inspector, GitHub workflow policy (`test_github_workflows.py`), and APK-backed `integration` tests.
-- `docs/`: Feature index (`FEATURE_CATALOG.md`) and technical reference docs (`PATCH_SPEC.md`, `CODE_CAVES.md`, `DEV_BUILD.md`, `AUTO_MODE_AI_GUIDE.md`, `GUILD_RAID_SELF_MERCENARY.md`, `HERO_AWAKENING_GUIDE.md`, `SKILL_REBALANCE_GUIDE.md`, `SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md`).
+- `tools/`: Reverse-engineering helpers, ELF/code-cave generators, `.env` cipher extractor (`extract_env_keys.py`), ADB probes, and release packagers (`create_distribution_zip.py`, `register_release.py`, `verify_release_apk.py`).
+- `tests/`: Unit, Keystone/Capstone/Unicorn emulation, GUI parity, inspector, GitHub workflow policy (`test_github_workflows.py`), Principle V invariant (`test_principle_v_invariants.py`), and APK-backed `integration` tests.
+- `docs/`: Feature index (`FEATURE_CATALOG.md`) and technical reference docs (`PATCH_SPEC.md`, `CODE_CAVES.md`, `DEV_BUILD.md`, `AUTO_MODE_AI_GUIDE.md`, `GUILD_RAID_SELF_MERCENARY.md`, `HEROS_MARK_GUIDE.md`, `HERO_AWAKENING_GUIDE.md`, `KNOWN_BUGS.md`, `SKILL_REBALANCE_GUIDE.md`, `SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md`).
 - `scripts/`: Toolchain setup (`setup-linux-toolchain.sh`).
-- `.github/`: CI matrix workflow (`ci.yml`), `CODEOWNERS`, issue/PR templates, and authorial PR/issue governance workflows (`pr-policy.yml`, `pr-policy-comment.yml`, `issue-triage.yml`).
+- `.github/`: CI & release workflows (`ci.yml`, `release.yml`), `dependabot.yml`, `CODEOWNERS`, issue/PR templates, and authorial PR/issue governance workflows (`pr-policy.yml`, `pr-policy-comment.yml`, `issue-triage.yml`).
 
 ## Agent Conduct: RE Output Hygiene & Provider Blocks
 
@@ -167,7 +167,7 @@ Run checks inside the project virtualenv rather than a bare system Python:
 .venv/bin/python -m compileall -q core gui tools tests fwt_patcher.py
 .venv/bin/ruff check .
 .venv/bin/mypy core gui fwt_patcher.py tools tests
-JAVA_HOME=/path/to/jdk21 .venv/bin/python -m pytest -q -m "not integration" --cov=core
+JAVA_HOME=/path/to/jdk21 .venv/bin/python -m pytest -q -m "not integration and not slow" --cov=core
 # Full non-slow suite when source/ reference APK is present:
 JAVA_HOME=/path/to/jdk21 .venv/bin/python -m pytest -q
 ```
@@ -177,7 +177,7 @@ JAVA_HOME=/path/to/jdk21 .venv/bin/python -m pytest -q
 .\.venv\Scripts\python.exe -m compileall -q core gui tools tests fwt_patcher.py
 .\.venv\Scripts\ruff.exe check .
 .\.venv\Scripts\mypy.exe core gui fwt_patcher.py tools tests
-.\.venv\Scripts\pytest.exe -q -m "not integration"
+.\.venv\Scripts\pytest.exe -q -m "not integration and not slow" --cov=core
 ```
 
 *(If `.venv/` on a shared drive is a Linux virtualenv (`bin/`), run the checks above with the native Windows Python 3.12+ interpreter instead of `.\.venv\Scripts\python.exe`.)*

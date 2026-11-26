@@ -472,21 +472,31 @@ class MainWindow(tk.Tk):
 
         self.config_canvas.bind("<Configure>", _resize_config)
 
+        def _is_descendant(widget: Any, ancestor: Any) -> bool:
+            if ancestor is None:
+                return False
+            w_path, a_path = str(widget), str(ancestor)
+            return w_path == a_path or w_path.startswith(a_path + ".")
+
         def _scroll_config(event: Any, units: int) -> None:
+            if units == 0:
+                return
             hovered = self.config_canvas.winfo_containing(event.x_root, event.y_root)
             if hovered is None:
                 return
             feature_grid = getattr(self, "_feature_grid_frame", None)
             feature_canvas = getattr(self, "_feature_canvas", None)
-            if hovered == feature_canvas or (feature_grid is not None and
-                    str(hovered).startswith(str(feature_grid))):
+            if hovered == feature_canvas or _is_descendant(hovered, feature_grid):
                 return
-            if hovered == self.config_canvas or str(hovered).startswith(str(left_pane)):
+            if hovered == self.config_canvas or _is_descendant(hovered, left_pane):
                 self.config_canvas.yview_scroll(units, "units")
 
-        self.bind_all("<MouseWheel>", lambda event: _scroll_config(
-            event, int(-event.delta / 120) if abs(event.delta) >= 120 else (-1 if event.delta > 0 else 1)
-        ), add="+")
+        def _wheel_units(delta: int) -> int:
+            if delta == 0:
+                return 0
+            return int(-delta / 120) if abs(delta) >= 120 else (-1 if delta > 0 else 1)
+
+        self.bind_all("<MouseWheel>", lambda event: _scroll_config(event, _wheel_units(event.delta)), add="+")
         self.bind_all("<Button-4>", lambda event: _scroll_config(event, -3), add="+")
         self.bind_all("<Button-5>", lambda event: _scroll_config(event, 3), add="+")
 
@@ -783,7 +793,7 @@ class MainWindow(tk.Tk):
             (self.var_trait_multi_unique, "Traits: Unique Batch Rolls", "Multi-roll Trait batches (10x change) never repeat the same attribute twice in one rolled list"),
             (self.var_trait_immunity_weight_x2, "Traits: Immunity Weight x2 (Slots 3-5)", "Doubles Slot 3..5 immunity trait weights (20,000 vs 10,000 normal stats, up from 335)"),
             (self.var_limit_break_step_10, "Limit Break +10 Levels (to Lv 120)", "Each Limit Break opens +10 levels at once up to Lv 120 (70->80->90->100->110->120)"),
-            (self.var_merlin_auto_support, "Merlin Slot-1 Auto Support (Magic infusion)", "When Merlin is in Slot 1 in Auto Mode, casts Magic infusion on reachable allies whose Awakening skill cooldown is 1 (slot order tie-break; attacks normally if out of range)"),
+            (self.var_merlin_auto_support, "Merlin Slot-1 Auto Support (Magic infusion)", "When Merlin is in Slot 1 in Auto Mode, casts Awake then Magic infusion (strongest-Awakening tie-break) ahead of bonus or item cells"),
             (self.var_align_16k, "Android 16 / 16 KB Page Alignment", "Aligns shared libraries to 16 KB boundaries for HyperOS / Android 16"),
         ]
 
@@ -1419,20 +1429,24 @@ class MainWindow(tk.Tk):
             self.inspect_base_apk()
 
     def refresh_devices(self):
+        if getattr(self, "_refreshing_devices", False):
+            return
+        self._refreshing_devices = True
+
         def _task():
             try:
                 devs = self.adb.list_devices()
-                self.devices = devs
             except Exception as exc:
                 self.log_viewer.log(f"Device discovery failed: {exc}", "error")
-                self.post_ui(
-                    lambda: self.badge_adb.set_status(
-                        "ADB: Error", active=False, color=ACCENT_RED
-                    )
-                )
+                def _on_err():
+                    self._refreshing_devices = False
+                    self.badge_adb.set_status("ADB: Error", active=False, color=ACCENT_RED)
+                self.post_ui(_on_err)
                 return
 
             def _update_ui():
+                self._refreshing_devices = False
+                self.devices = devs
                 if devs:
                     self.badge_adb.set_status(f"ADB: {len(devs)} Device(s)", active=True)
                     labels = [d["label"] for d in devs]
@@ -1451,6 +1465,8 @@ class MainWindow(tk.Tk):
         threading.Thread(target=_task, daemon=True).start()
 
     def connect_wifi_adb(self):
+        if getattr(self, "_connecting_adb", False):
+            return
         ip_port = simpledialog.askstring(
             "Connect Wi-Fi ADB",
             "Enter Device IP:Port (e.g. 192.0.2.10:5555):",
@@ -1458,16 +1474,20 @@ class MainWindow(tk.Tk):
         )
         if not ip_port:
             return
+        self._connecting_adb = True
 
         def _task():
-            self.log_viewer.log(f"Connecting to ADB target: {ip_port}...")
-            ok, msg = self.adb.connect(ip_port)
-            if ok:
-                self.log_viewer.log(f"Connected: {msg}", "success")
-                self.refresh_devices()
-            else:
-                self.log_viewer.log(f"Connection failed: {msg}", "error")
-                self.post_ui(messagebox.showerror, "Connection Failed", msg)
+            try:
+                self.log_viewer.log(f"Connecting to ADB target: {ip_port}...")
+                ok, msg = self.adb.connect(ip_port)
+                if ok:
+                    self.log_viewer.log(f"Connected: {msg}", "success")
+                    self.post_ui(self.refresh_devices)
+                else:
+                    self.log_viewer.log(f"Connection failed: {msg}", "error")
+                    self.post_ui(messagebox.showerror, "Connection Failed", msg)
+            finally:
+                self.post_ui(lambda: setattr(self, "_connecting_adb", False))
 
         threading.Thread(target=_task, daemon=True).start()
 
@@ -1475,7 +1495,16 @@ class MainWindow(tk.Tk):
         val = self.device_combo_var.get()
         if not val:
             return None
-        return val.split()[0]
+        dev_id = val.split()[0]
+        for dev in getattr(self, "devices", []):
+            if dev.get("id") == dev_id and dev.get("state") not in (None, "device"):
+                messagebox.showwarning(
+                    "Device Not Ready",
+                    f"Device {dev_id} is currently '{dev.get('state')}'. Authorize or reconnect it first.",
+                    parent=self,
+                )
+                return None
+        return dev_id
 
     def _begin_device_op(self) -> bool:
         if self.is_busy or self.device_op_active:
@@ -1587,11 +1616,14 @@ class MainWindow(tk.Tk):
         threading.Thread(target=_task, daemon=True).start()
 
     def inspect_base_apk(self):
-        apk_path = Path(self.in_picker.get_path())
+        if getattr(self, "_inspecting_base", False):
+            return
+        apk_path = Path(self.in_picker.get_path()).expanduser()
         if not apk_path.is_file():
-            messagebox.showwarning("File Missing", f"Base APK file not found:\n{apk_path}")
+            messagebox.showwarning("File Missing", f"Base APK file not found:\n{apk_path}", parent=self)
             return
 
+        self._inspecting_base = True
         self.lbl_inspection_status.config(text="Inspecting APK...", fg=ACCENT_CYAN)
 
         def _task():
@@ -1599,6 +1631,7 @@ class MainWindow(tk.Tk):
             try:
                 rep = inspect_apk(apk_path)
             except Exception as exc:
+                self.post_ui(lambda: setattr(self, "_inspecting_base", False))
                 self.log_viewer.log(f"Inspection failed: {exc}", "error")
                 self.post_ui(
                     self.lbl_inspection_status.config,
@@ -1608,6 +1641,7 @@ class MainWindow(tk.Tk):
                 return
 
             def _update_ui():
+                self._inspecting_base = False
                 if not rep.is_valid_apk:
                     self.lbl_inspection_status.config(text="Invalid APK file", fg=ACCENT_RED)
                     self.log_viewer.log(

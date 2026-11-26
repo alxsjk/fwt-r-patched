@@ -29,10 +29,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _aapt2() -> str | None:
-    candidates = [
+    import os
+
+    exe = "aapt2.exe" if os.name == "nt" else "aapt2"
+    candidates: list[str | None] = [
         shutil.which("aapt2"),
-        str(Path.home() / "opt" / "android-build-tools" / "aapt2"),
+        str(Path.home() / "opt" / "android-build-tools" / exe),
     ]
+    for env_key in ("ANDROID_SDK_ROOT", "ANDROID_HOME"):
+        root = os.environ.get(env_key)
+        if root:
+            for match in sorted((Path(root) / "build-tools").glob(f"*/{exe}"), reverse=True):
+                candidates.append(str(match))
     for candidate in candidates:
         if candidate and Path(candidate).is_file():
             return candidate

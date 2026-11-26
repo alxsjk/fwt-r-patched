@@ -2781,6 +2781,13 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
 
     # 13. LAN Redirect Shim Check
     try:
+        from core.core_patches import (
+            ARM64_MOV_W0_1,
+            ARM64_NOP,
+            ARM64_RET,
+            SERVER_SPAWN_BL_VADDRS,
+        )
+
         shim_off = seg_offset(SHIM_VADDR)
         magic = struct.unpack_from("<I", so_bytes, shim_off + 8)[0]
         boundary_off = seg_offset(0xAAD9F8)
@@ -2788,13 +2795,34 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
         boundary_ok = bytes(so_bytes[boundary_off:boundary_off + 4]) == boundary_expected
         loopback_off = seg_offset(0xAA6D70)
         loopback_ok = (
-            bytes(so_bytes[loopback_off:loopback_off + 4]) == LOOPBACK_CONNECT_STUB[:4]
+            bytes(so_bytes[loopback_off:loopback_off + len(LOOPBACK_CONNECT_STUB)])
+            == LOOPBACK_CONNECT_STUB
+        )
+        ready_off = seg_offset(0xAB5D48)
+        ready_ok = (
+            bytes(so_bytes[ready_off:ready_off + 4])
+            == encode_arm64_branch(0xAB5D48, 0xAA6D2C, link=True)
+        )
+        reaper_ok = bytes(so_bytes[seg_offset(0xAAE450):seg_offset(0xAAE450) + 4]) == ARM64_RET
+        att_ok = bytes(so_bytes[seg_offset(0xAADE84):seg_offset(0xAADE84) + 4]) == ARM64_MOV_W0_1
+        shop_ok = bytes(so_bytes[seg_offset(0xAADFA0):seg_offset(0xAADFA0) + 4]) == ARM64_MOV_W0_1
+        spawns_ok = all(
+            bytes(so_bytes[seg_offset(addr):seg_offset(addr) + 4]) == ARM64_NOP
+            for addr in SERVER_SPAWN_BL_VADDRS
         )
         if magic == SHIM_MAGIC:
             ip_raw = bytes(so_bytes[shim_off + 12:shim_off + 16])
             port = struct.unpack_from(">H", so_bytes, shim_off + 16)[0]
             ip_str = str(ipaddress.IPv4Address(ip_raw))
-            active = boundary_ok and loopback_ok
+            active = (
+                boundary_ok
+                and loopback_ok
+                and ready_ok
+                and reaper_ok
+                and att_ok
+                and shop_ok
+                and spawns_ok
+            )
             _feature(
                 reports,
                 "network_mode",
@@ -2802,7 +2830,8 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
                 active,
                 f"LAN Redirect ({ip_str}:{port})" if active else "LAN Redirect (partial)",
                 f"shim magic ok; boundary={'ok' if boundary_ok else 'missing'}, "
-                f"loopback={'ok' if loopback_ok else 'missing'}",
+                f"loopback={'ok' if loopback_ok else 'missing'}, "
+                f"hooks={'ok' if (ready_ok and reaper_ok and att_ok and shop_ok and spawns_ok) else 'partial'}",
                 value=(ip_str, port),
             )
         else:
@@ -2817,12 +2846,39 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
     except Exception as exc:
         _feature(reports, "network_mode", "Network Mode", False, "Unknown", str(exc))
 
-    # Dev build marker (phase 5): a dev APK announces which build produced it.
+    # Dev build marker & instrumentation caves: detect dev instrumentation even without marker.
     try:
+        from core.core_patches import (
+            DEV_LOG_CAVE_VADDR,
+            DEV_LOG_HOOK_VADDR,
+            DEV_TIMING_CAVE_VADDR,
+            DEV_TIMING_HOOK_SITES,
+        )
+
         dev_marker = find_dev_build_marker(so_bytes)
+        dev_log_branch = encode_arm64_branch(DEV_LOG_HOOK_VADDR, DEV_LOG_CAVE_VADDR)
+        dev_log_hooked = (
+            bytes(so_bytes[seg_offset(DEV_LOG_HOOK_VADDR):seg_offset(DEV_LOG_HOOK_VADDR) + 4])
+            == dev_log_branch
+        )
+        dev_timing_hooked = any(
+            bytes(so_bytes[seg_offset(site):seg_offset(site) + 4])
+            == encode_arm64_branch(site, DEV_TIMING_CAVE_VADDR)
+            for site in DEV_TIMING_HOOK_SITES
+        )
         if dev_marker:
             _feature(
                 reports, "dev_build_marker", "Dev Build Marker", True, "Dev build", dev_marker
+            )
+        elif dev_log_hooked or dev_timing_hooked:
+            kinds = [k for k, on in (("dispatch_log", dev_log_hooked), ("handler_timing", dev_timing_hooked)) if on]
+            _feature(
+                reports,
+                "dev_build_marker",
+                "Dev Build Marker",
+                True,
+                "Dev build",
+                f"Dev instrumentation cave detected ({', '.join(kinds)})",
             )
         else:
             _feature(
@@ -3545,6 +3601,19 @@ def inspect_apk(apk_path: Path | str) -> InspectionReport:
                 if report.build_identity == "release":
                     report.build_identity = "unknown"
 
+            core_entries = (
+                "AndroidManifest.xml",
+                "lib/arm64-v8a/libfwt_local_server.so",
+                "classes8.dex",
+                "assets/fwt_resources_v1.zip",
+            )
+            duplicates = [name for name in core_entries if names.count(name) > 1]
+            if duplicates:
+                report.is_valid_apk = False
+                report.error_message = f"Duplicate core APK entr(ies): {', '.join(duplicates)}"
+                report.alignment_details = report.error_message
+                return report
+
             so_data: bytes | None = None
             so_name = "lib/arm64-v8a/libfwt_local_server.so"
             if so_name in names:
@@ -3554,7 +3623,8 @@ def inspect_apk(apk_path: Path | str) -> InspectionReport:
                 report.is_pristine_reference = report.so_sha256 == REFERENCE_SO_SHA256
                 report.cave_overlap = detect_cave_overlap(so_data)
                 report.features.update(inspect_native_so(so_data))
-                if find_dev_build_marker(so_data):
+                dev_feat = report.features.get("dev_build_marker")
+                if find_dev_build_marker(so_data) or (dev_feat is not None and dev_feat.active):
                     report.build_identity = "dev"
 
             dex_name = "classes8.dex"

@@ -393,6 +393,14 @@ def _java_executable() -> str:
 
 
 def _run_apktool(jar: Path, args: list[str], description: str) -> None:
+    if not jar.is_file():
+        raise RuntimeError(f"apktool jar does not exist: {jar}")
+    digest = _sha256_file(jar).lower()
+    if digest != APKTOOL_SHA256.lower():
+        raise RuntimeError(
+            f"apktool jar at {jar} has unexpected SHA-256 {digest} "
+            f"(expected {APKTOOL_SHA256})"
+        )
     command = [_java_executable(), "-jar", str(jar), *args]
     try:
         result = subprocess.run(
@@ -436,14 +444,19 @@ def _replace_smali_strings(
 
 
 def _replace_const_wide_literal(text: str, old_hex: str, value: int) -> str:
-    """Replaces a const-wide literal, upgrading /16 to /32 when necessary."""
+    """Replaces a const-wide literal, upgrading /16 -> /32 -> 64-bit const-wide when necessary."""
     pattern = re.compile(
-        rf"const-wide/(16|32)(\s+\S+,\s*){re.escape(old_hex)}\b"
+        rf"const-wide(?:/(?:16|32))?(\s+\S+,\s*){re.escape(old_hex)}\b"
     )
 
     def replace(match: re.Match[str]) -> str:
-        prefix = f"const-wide/{'16' if value <= 0x7FFF else '32'}"
-        return f"{prefix}{match.group(2)}0x{value:x}"
+        if value <= 0x7FFF:
+            prefix = "const-wide/16"
+        elif value <= 0x7FFFFFFF:
+            prefix = "const-wide/32"
+        else:
+            prefix = "const-wide"
+        return f"{prefix}{match.group(1)}0x{value:x}"
 
     text = pattern.sub(replace, text)
     # Static final field initializers keep their long suffix.
@@ -587,6 +600,19 @@ def patch_bootstrap_smali_directory(
                     f"Resource byte count was not fully updated in {path.name}"
                 )
         main_text = main_file.read_text(encoding="utf-8")
+        all_texts = "\n".join(path.read_text(encoding="utf-8") for path in files)
+        for relative_path, new_sha in contract.critical_hashes:
+            reference_sha = REFERENCE_CRITICAL_FILE_HASHES.get(relative_path)
+            if not reference_sha or new_sha == reference_sha:
+                continue
+            if reference_sha in all_texts:
+                raise ValueError(
+                    f"Critical resource hash for {relative_path} was not fully updated"
+                )
+            if new_sha not in all_texts:
+                raise ValueError(
+                    f"Updated critical resource hash for {relative_path} not found in bootstrap smali"
+                )
         if expected_sha not in main_text:
             raise ValueError("Resource SHA-256 is missing from the bootstrap fields")
         if expected_files not in main_text:

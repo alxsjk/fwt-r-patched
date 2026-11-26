@@ -165,7 +165,7 @@ def run_cli(args: argparse.Namespace) -> int:
         print(f"  apksigner: {tools.apksigner or 'MISSING'}")
         print(f"  keytool  : {tools.keytool or 'MISSING'}")
         print(f"  adb      : {tools.adb or 'not found (optional for APK-only builds)'}")
-        for module in ("dotenv", "UnityPy", "cryptography", "elftools", "capstone", "keystone"):
+        for module in ("dotenv", "UnityPy", "cryptography", "PIL", "elftools", "capstone", "keystone"):
             state = "installed" if importlib.util.find_spec(module) else "MISSING"
             print(f"  python {module:<12}: {state}")
         if tools.has_packaging_tools:
@@ -368,7 +368,7 @@ def run_cli(args: argparse.Namespace) -> int:
         soulgear_enchant_always=(args.all or args.soulgear_enchant_always),
         rune_quality_factor=(
             args.rune_quality_factor
-            if args.rune_quality_factor
+            if args.rune_quality_factor is not None
             else (10 if args.all else 0)
         ),
         rune_option_quality=(args.all or args.rune_option_quality),
@@ -679,7 +679,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--equipment-percent-options", action="store_true", help="Remove flat equipment option rolls; only percentage options (+X%%) are drawn")
     parser.add_argument("--equipment-upgrade-10-guarantee", action="store_true", help="Make the +9 -> +10 equipment upgrade succeed on the first attempt")
     parser.add_argument("--rune-box-random-roll", action="store_true", help="Rune box draws its slot and type randomly again (the dev's deterministic roll is kept for grade/quality and the fourth attribute)")
-    parser.add_argument("--rune-quality-factor", type=int, default=0, metavar="N", help="Scale rune attribute mastery bias by N (450 * N, capped at 10000) and exclude fixed-value attributes; N=0 disables both changes")
+    parser.add_argument("--rune-quality-factor", type=int, default=None, metavar="N", help="Scale rune attribute mastery bias by N (450 * N, capped at 10000) and exclude fixed-value attributes; N=0 disables both changes")
     parser.add_argument("--rune-option-quality", action="store_true", help="Rune rolls always use the maximum Lord mastery weight row")
     parser.add_argument("--rune-upgrade", action="store_true", help="Rune upgrades +12..+15 always succeed and cost a tenth of the gold")
     parser.add_argument("--gold-cylinder-x10", action="store_true", help="Gold Cylinder yields 10x gold per collection")

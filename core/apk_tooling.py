@@ -519,7 +519,11 @@ def _rewrite_zip_entries_to_file(
             )
 
         ordered = sorted(infos, key=lambda item: item.header_offset)
-        next_offsets = [item.header_offset for item in ordered[1:]] + [central_start]
+        next_offsets = (
+            [item.header_offset for item in ordered[1:]] + [central_start]
+            if ordered
+            else []
+        )
         new_offsets: dict[int, int] = {}
         output_size = 0
 
@@ -544,13 +548,14 @@ def _rewrite_zip_entries_to_file(
                 _compressed_size,
                 _uncompressed_size,
                 name_length,
-                extra_length,
+                _extra_length,
             ) = struct.unpack("<IHHHHHIIIHH", local_header)
             if signature != 0x04034B50:
                 raise ValueError(f"Invalid local ZIP header for {info.filename}")
             name_start = info.header_offset + 30
             name = _read_at(raw_file, name_start, name_length)
-            extra = _read_at(raw_file, name_start + name_length, extra_length)
+            # Strip extra consistently with the central directory so stale ZIP64 fields cannot remain.
+            extra = b""
             crc = zlib.crc32(replacement) & 0xFFFFFFFF
             # Preserve the UTF-8 flag, drop the data-descriptor flag and store
             # the replacement uncompressed (platform-independent bytes).
@@ -809,10 +814,12 @@ def _read_datatable_rows(
     except ImportError:
         return None, "Optional dependencies (UnityPy/cryptography) not available"
 
-    if entry_name not in archive.namelist():
+    try:
+        raw_entry = archive.read(entry_name)
+    except KeyError:
         return None, f"{label} not found in the resource archive"
     try:
-        clear, _key, _iv = _decrypt_datatable(archive.read(entry_name))
+        clear, _key, _iv = _decrypt_datatable(raw_entry)
         env = UnityPy.load(clear)
         rows: list[dict[str, Any]] = []
         for obj in env.objects:
@@ -1864,10 +1871,11 @@ def _patch_resources_zip_file(
                                             f"unexpected PVP honor reward count: {count}"
                                         )
                             obj.save_typetree(tree)
-                    new_clear = bytes(getattr(env.file, "save")())  # noqa: B009
-                    patched = _encrypt_datatable(new_clear, k, v)
-                    if patched != data:
-                        replacements[info.filename] = patched
+                    if changed:
+                        new_clear = bytes(getattr(env.file, "save")(packer="original"))  # noqa: B009
+                        patched = _encrypt_datatable(new_clear, k, v)
+                        if patched != data:
+                            replacements[info.filename] = patched
                     if log_fn and changed:
                         log_fn(
                             "Patched honorreward.unity3d: 10x PVP win honor coins (6 -> 60)"
@@ -2452,6 +2460,41 @@ def _patch_resources_zip_file(
                     if log_fn:
                         log_fn(f"Failed to patch shopdata: {exc}")
 
+        archive_names = set(archive.namelist())
+        expected_datatables: list[tuple[bool, str, str]] = [
+            (options.sacred_lands_restore, "setitemtable", r"files/Resources/(?:datatable/)?setitemtable[a-z]*\.unity3d$"),
+            (options.sacred_lands_restore, "equipselectlist.unity3d", r"files/Resources/datatable/equipselectlist\.unity3d$"),
+            (options.recycle_six_star, "equipreward.unity3d", r"files/Resources/(?:datatable/)?equipreward\.unity3d$"),
+            (options.mode_drops_x10, "honorreward.unity3d", r"files/Resources/datatable/honorreward\.unity3d$"),
+            (options.mode_drops_x10, "worldbossreward", r"files/Resources/datatable/worldbossreward[a-z]*\.unity3d$"),
+            (options.equipment_percent_options, "randoptiontable.unity3d", r"files/Resources/datatable/randoptiontable\.unity3d$"),
+            (options.equipment_upgrade_10_guarantee, "equipsuccessprobability.unity3d", r"files/Resources/datatable/equipsuccessprobability\.unity3d$"),
+            (
+                options.limit_break_cost_tenth or options.limit_break_cost_fixed or options.limit_break_step_10,
+                "limitbreakcost.unity3d",
+                r"files/Resources/datatable/limitbreakcost\.unity3d$",
+            ),
+            (options.rune_option_quality or options.rune_quality_factor > 0, "runeoption.unity3d", r"files/Resources/datatable/runeoption\.unity3d$"),
+            (options.rune_upgrade_discount, "runeenchant.unity3d", r"files/Resources/datatable/runeenchant\.unity3d$"),
+            (options.crystal_skill_90_off, "crystalskillcost.unity3d", r"files/Resources/datatable/crystalskillcost\.unity3d$"),
+            (options.guild_raid_fire_support or options.guild_raid_skills_max, "guildskilldata.unity3d", r"files/Resources/datatable/guildskilldata\.unity3d$"),
+            (options.guild_raid_skills_max, "guildskillinfo", r"files/Resources/datatable/guildskillinfo[a-z]*\.unity3d$"),
+            (options.guild_raid_boss_no_counter, "monsterdata.unity3d", r"files/Resources/datatable/monsterdata\.unity3d$"),
+            (
+                options.event_discount or options.event_gene_unlimited or options.event_limits_daily or options.campaign_shop_discount,
+                "shopcontentsdata",
+                r"files/Resources/datatable/shopcontentsdata[a-z]*\.unity3d$",
+            ),
+            (
+                options.event_discount or options.event_gene_unlimited or options.event_limits_daily or options.campaign_shop_discount,
+                "shopdata",
+                r"files/Resources/datatable/shopdata[a-z]*\.unity3d$",
+            ),
+        ]
+        for enabled, label, pattern in expected_datatables:
+            if enabled and not any(re.match(pattern, n) for n in archive_names):
+                failures.append(f"missing expected datatable in resource archive: {label}")
+
         if options.alex_awakening:
             from core.alex_awakening_assets import _PATH, _patch_gate, prepare_assets
 
@@ -2620,14 +2663,11 @@ def repack_and_sign_apk(
 
     check_cancel()
 
-    if not tools.has_packaging_tools:
+    if not tools.has_packaging_tools or not tools.zipalign or not tools.apksigner or not tools.keytool:
         raise RuntimeError(describe_missing_packaging_tools(tools))
     zipalign = tools.zipalign
     apksigner = tools.apksigner
     keytool = tools.keytool
-    assert zipalign
-    assert apksigner
-    assert keytool
 
     input_apk = Path(input_apk)
     output_apk = Path(output_apk)
@@ -2967,13 +3007,11 @@ class AdbHelper:
         Treating an adb/offline failure as "not installed" silently disables
         the pre-install save backup, so the three states are kept distinct.
         """
-        code, out, err = self.run_cmd(
+        code, out, _err = self.run_cmd(
             ["-s", device_id, "shell", "pm", "path", PACKAGE_NAME], timeout=15
         )
         if code == 0:
             return "installed" if out.startswith("package:") else "not_installed"
-        if code != 0 and not err:
-            return "unknown"
         return "unknown"
 
     def is_package_installed(self, device_id: str) -> bool:
@@ -3178,13 +3216,17 @@ class AdbHelper:
             return False, f"Could not push backup to device: {err or out}"
         remote_cmd = (
             "set -e; "
+            f"am force-stop {PACKAGE_NAME} 2>/dev/null || true; "
+            "APP_UID=$(stat -c %u:%g /data/data/com.nexon.fwar); "
             "mkdir -p /data/data/com.nexon.fwar/files/fwt; "
+            "chown -R \"$APP_UID\" /data/data/com.nexon.fwar/files; "
             f"if [ -f {REMOTE_SAVE_PATH} ]; then "
             f"cp -p {REMOTE_SAVE_PATH} {REMOTE_SAVE_PATH}.bak.$(date +%s); fi; "
-            f"cp {remote_tmp} {REMOTE_SAVE_PATH}; "
-            f"cmp -s {remote_tmp} {REMOTE_SAVE_PATH}; "
-            f"chown $(stat -c %u:%g /data/data/com.nexon.fwar) {REMOTE_SAVE_PATH}; "
-            f"chmod 600 {REMOTE_SAVE_PATH}; "
+            f"cp {remote_tmp} {REMOTE_SAVE_PATH}.new; "
+            f"cmp -s {remote_tmp} {REMOTE_SAVE_PATH}.new; "
+            f"chown \"$APP_UID\" {REMOTE_SAVE_PATH}.new; "
+            f"chmod 600 {REMOTE_SAVE_PATH}.new; "
+            f"mv -f {REMOTE_SAVE_PATH}.new {REMOTE_SAVE_PATH}; "
             f"restorecon {REMOTE_SAVE_PATH} 2>/dev/null || true"
         )
         if self._is_shell_root(device_id):

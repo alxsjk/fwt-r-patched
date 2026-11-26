@@ -33,6 +33,7 @@ analysis = [
     "unicorn>=2.1.4",
     "lief>=1.0.0",
     "frida-tools>=14.13.1",
+    "websockets>=13,<14",
     "polars[rtcompat]>=2.1.0",
     "pandas>=3.1.1",
     # DuckDB 2.x requires x86-64-v3 (AVX2); <2 preserves compatibility with older x86-64 CPUs.
@@ -79,6 +80,7 @@ packages = ["core", "gui"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config -m 'not slow'"
+timeout = 120
 markers = [
     "integration: requires the proprietary reference APK in source/",
     "slow: disassembles the whole native library (minutes); opt in with -m slow",
@@ -91,7 +93,7 @@ source = ["core"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 35
+fail_under = 45
 
 [tool.ruff]
 line-length = 100
@@ -99,16 +101,35 @@ target-version = "py312"
 extend-exclude = [".specify"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "W", "C4", "SIM", "PT"]
-# E402: fwt_patcher.py inserts the project root into sys.path before imports.
+select = ["E", "F", "I", "UP", "B", "W", "C4", "SIM", "PT", "PIE"]
 # UP045: keep Optional[...] for clarity on Python 3.12.
-ignore = ["E501", "E402", "UP045"]
+ignore = ["E501", "UP045"]
+
+[tool.ruff.lint.per-file-ignores]
+"fwt_patcher.py" = ["E402"]
+"tools/*.py" = ["E402"]
+"tests/*.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.12"
-ignore_missing_imports = true
 warn_unused_ignores = true
 check_untyped_defs = true
 warn_unreachable = true
 no_implicit_optional = true
 warn_return_any = true
+
+[[tool.mypy.overrides]]
+module = [
+    "capstone.*",
+    "keystone.*",
+    "unicorn.*",
+    "UnityPy.*",
+    "elftools.*",
+    "PIL.*",
+    "dotenv.*",
+    "cryptography.*",
+    "lief.*",
+    "frida.*",
+    "adbutils.*",
+]
+ignore_missing_imports = true

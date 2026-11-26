@@ -8,27 +8,22 @@ from __future__ import annotations
 
 import hashlib
 import io
+import struct
 
-from elftools.elf.elffile import ELFFile
-
-from core.alex_awakening_client import (
-    CLIENT_CAVE_START,
-    RELEASE_LATE_HOOK_EXPECTED,
-    RELEASE_LATE_HOOK_SITE,
-    assemble_client_cave,
-)
-from core.alex_awakening_native import (
-    _BACKWALK_CAVE,
-    _BACKWALK_STRIDE,
-    _CANDIDATE_COST,
-    BACKWALK_SPECS,
-    CANDIDATE_COST_ROW,
-    _candidate_in_memory,
-)
 from core.elf_mapping import read_load_segments, translate_vaddr
 
 
 def _server_ranges(reference: bytes) -> list[tuple[int, int]]:
+    from elftools.elf.elffile import ELFFile
+
+    from core.alex_awakening_native import (
+        _BACKWALK_CAVE,
+        _BACKWALK_STRIDE,
+        _CANDIDATE_COST,
+        BACKWALK_SPECS,
+        CANDIDATE_COST_ROW,
+    )
+
     elf = ELFFile(io.BytesIO(reference))
     segments = list(elf.iter_segments())
     writable = [
@@ -54,6 +49,14 @@ def _server_ranges(reference: bytes) -> list[tuple[int, int]]:
 
 def apply_alex_awakening(reference: bytes, patched: bytes, *, diagnostics: bool = False) -> bytes:
     """Compose native and client hooks, rejecting overlap with other patches."""
+    from core.alex_awakening_client import (
+        CLIENT_CAVE_START,
+        RELEASE_LATE_HOOK_EXPECTED,
+        RELEASE_LATE_HOOK_SITE,
+        assemble_client_cave,
+    )
+    from core.alex_awakening_native import _candidate_in_memory
+
     if len(reference) != len(patched):
         raise ValueError("Unexpected patched server length")
     candidate = _candidate_in_memory(reference)
@@ -101,10 +104,20 @@ def inspect_alex_awakening_native(data: bytes | bytearray) -> bool:
         offset = translate_vaddr(loads, address, len(expected))
         if raw[offset:offset + len(expected)] != expected:
             return False
-    elf = ELFFile(io.BytesIO(raw))
-    return any(
-        segment["p_type"] == "PT_LOAD" and int(segment["p_flags"]) & 2
-        and int(segment["p_vaddr"]) + int(segment["p_memsz"]) == 0xBE62C8
-        and int(segment["p_memsz"]) == 0x3618
-        for segment in elf.iter_segments()
-    )
+    if len(raw) < 64 or raw[:4] != b"\x7fELF" or raw[4] != 2 or raw[5] != 1:
+        return False
+    e_phoff = struct.unpack_from("<Q", raw, 32)[0]
+    e_phentsize = struct.unpack_from("<H", raw, 54)[0]
+    e_phnum = struct.unpack_from("<H", raw, 56)[0]
+    if e_phentsize < 56 or e_phoff + e_phnum * e_phentsize > len(raw):
+        return False
+    for idx in range(e_phnum):
+        ph = e_phoff + idx * e_phentsize
+        p_type, p_flags = struct.unpack_from("<II", raw, ph)
+        if p_type != 1 or not (p_flags & 2):
+            continue
+        p_vaddr = struct.unpack_from("<Q", raw, ph + 16)[0]
+        p_memsz = struct.unpack_from("<Q", raw, ph + 40)[0]
+        if p_vaddr + p_memsz == 0xBE62C8 and p_memsz == 0x3618:
+            return True
+    return False

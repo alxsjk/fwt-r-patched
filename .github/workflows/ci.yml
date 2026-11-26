@@ -18,8 +18,8 @@ jobs:
         os: [ubuntu-24.04, windows-latest]
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install project
@@ -30,6 +30,10 @@ jobs:
         run: python -m mypy core gui fwt_patcher.py tools tests
       - name: Compile
         run: python -m compileall -q core gui tools tests fwt_patcher.py
+      - name: Dependency audit (pip-audit)
+        if: matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.13'
+        continue-on-error: true
+        run: python -m pip_audit
       - name: Unit tests (no proprietary APK)
         run: python -m pytest -q -m "not integration and not slow" -rs --cov=core --cov-report=term-missing
       - name: Integration tests (APK-dependent; skipped without source APK)

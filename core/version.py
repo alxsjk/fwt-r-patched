@@ -39,6 +39,8 @@ def versioned_output_path(path: Path, *, dev: bool = False) -> Path:
     # game and must keep its plain name.
     if path.suffix.lower() == ".apk":
         marker = "-dev" if dev else RELEASE_OUTPUT_SUFFIX
-        if marker not in name:
+        other = RELEASE_OUTPUT_SUFFIX if dev else "-dev"
+        name = re.sub(rf"{re.escape(other)}(?=$|-)", "", name)
+        if not re.search(rf"{re.escape(marker)}(?=$|-)", name):
             name = f"{name}{marker}"
     return path.with_name(f"{name}{path.suffix}")

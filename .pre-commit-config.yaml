@@ -1,15 +1,21 @@
 repos:
   - repo: local
     hooks:
+      - id: compileall
+        name: compileall
+        entry: python3 -m compileall -q core gui tools tests fwt_patcher.py
+        language: system
+        types_or: [python]
+        pass_filenames: false
       - id: ruff
         name: ruff
-        entry: python -m ruff check .
+        entry: python3 -m ruff check .
         language: system
         types_or: [python]
         pass_filenames: false
       - id: mypy
         name: mypy
-        entry: python -m mypy core gui tools fwt_patcher.py tests
+        entry: python3 -m mypy core gui tools fwt_patcher.py tests
         language: system
         types_or: [python]
         pass_filenames: false

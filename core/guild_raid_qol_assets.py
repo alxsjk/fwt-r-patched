@@ -73,11 +73,13 @@ def _row_matches_values(row: dict[str, Any], values: tuple[float, float, float, 
 def patch_guildskilldata_max_rows(rows: list[dict[str, Any]]) -> int:
     """Rewrites Guild Raid skill effect rows (1048577, 1048579..1048582) to max values."""
     seen: set[int] = set()
-    changed = 0
+    to_update: list[tuple[dict[str, Any], tuple[float, float, float, float]]] = []
     for row in rows:
         eid = row.get("_guildSkillEffectId")
         if eid not in GUILD_SKILL_MAX_SPECS:
             continue
+        if eid in seen:
+            raise ValueError(f"Duplicate guildskilldata effect row: {eid}")
         seen.add(eid)
         stock_vals, patched_vals = GUILD_SKILL_MAX_SPECS[eid]
         if _row_matches_values(row, patched_vals):
@@ -87,13 +89,14 @@ def patch_guildskilldata_max_rows(rows: list[dict[str, Any]]) -> int:
             raise ValueError(
                 f"Unexpected guildskilldata row {eid}: {actual!r}"
             )
-        for field, target in zip(GUILD_SKILL_VALUE_FIELDS, patched_vals, strict=True):
-            row[field] = target
-        changed += 1
+        to_update.append((row, patched_vals))
     if seen != set(GUILD_SKILL_MAX_SPECS):
         missing = sorted(set(GUILD_SKILL_MAX_SPECS) - seen)
         raise ValueError(f"guildskilldata missing effect row(s): {missing}")
-    return changed
+    for row, patched_vals in to_update:
+        for field, target in zip(GUILD_SKILL_VALUE_FIELDS, patched_vals, strict=True):
+            row[field] = target
+    return len(to_update)
 
 
 def inspect_guildskilldata_max_rows(rows: list[dict[str, Any]]) -> tuple[bool, str]:
@@ -164,11 +167,13 @@ def inspect_guildskillinfo_max_rows(rows: list[dict[str, Any]]) -> tuple[bool, s
 def patch_monsterdata_boss_car_rows(rows: list[dict[str, Any]]) -> int:
     """Zeros ``_car`` (0.0) on all 70 Guild Raid boss rows in ``monsterdata.unity3d``."""
     seen: set[int] = set()
-    changed = 0
+    to_update: list[dict[str, Any]] = []
     for row in rows:
         mid = row.get("_monsterId")
         if mid not in GUILD_RAID_BOSS_MONSTER_IDS:
             continue
+        if mid in seen:
+            raise ValueError(f"Duplicate monsterdata Guild Raid boss row: {mid}")
         seen.add(mid)
         car = float(row.get("_car", -999.0))
         if math.isclose(car, 0.0, abs_tol=1e-6):
@@ -177,12 +182,13 @@ def patch_monsterdata_boss_car_rows(rows: list[dict[str, Any]]) -> int:
             raise ValueError(
                 f"Unexpected monsterdata _car={car!r} for Guild Raid boss {mid}"
             )
-        row["_car"] = 0.0
-        changed += 1
+        to_update.append(row)
     if seen != GUILD_RAID_BOSS_MONSTER_IDS:
         missing = len(GUILD_RAID_BOSS_MONSTER_IDS - seen)
         raise ValueError(f"monsterdata missing {missing} Guild Raid boss row(s)")
-    return changed
+    for row in to_update:
+        row["_car"] = 0.0
+    return len(to_update)
 
 
 def inspect_monsterdata_boss_car_rows(rows: list[dict[str, Any]]) -> tuple[bool, str]:

@@ -1045,29 +1045,57 @@ def _accepts_size(seg_offset: Any) -> bool:
         return False
 
 
+ALEX_MARK_SERVER_CAVE_PATCHED_LEN = 140
+ALEX_MARK_SERVER_CAVE_PATCHED_SHA256 = (
+    "82c7fb7a53c0632937e96df50b3fed37806f994ff16297d11a177e8f5826f50d"
+)
+ALEX_MARK_CLIENT_CAVE_PATCHED_LEN = 255
+ALEX_MARK_CLIENT_CAVE_PATCHED_SHA256 = (
+    "ad4cf45701f3b194b802263e3b61eba2b366520b4d897b9e4cf9ed4c4fb6a837"
+)
+ALEX_MARK_CLIENT_INSTALL_PATCHED = bytes.fromhex("e7f10194")
+ALEX_MARK_KIDS_PATCHED_SITES: tuple[tuple[int, bytes], ...] = (
+    (0x7EBDEC, bytes.fromhex("7cfc0c14")),
+    (0x7EC814, bytes.fromhex("f9f90c14")),
+    (0x8B08A4, bytes.fromhex("dce90914")),
+    (0x9A027C, bytes.fromhex("6d2b0614")),
+    (0xA1B42C, bytes.fromhex("083f0414")),
+)
+
+
 def inspect_alex_heros_mark_so(
     so_bytes: bytes | bytearray,
     seg_offset: Any,
 ) -> tuple[bool, str]:
-    """Verify server kIds cave + client Lv10 cooltime hook in libfwt_local_server.so."""
-    site_patches, server_cave = build_alex_heros_mark_server_cave()
-    install_bl, client_cave = build_alex_heros_mark_client_cave()
+    """Verify server kIds cave + client Lv10 cooltime hook without requiring keystone."""
+    import hashlib
 
     srv_cave_off = seg_offset(ALEX_MARK_SERVER_CAVE_VADDR)
-    srv_cave_ok = bytes(so_bytes[srv_cave_off:srv_cave_off + len(server_cave)]) == server_cave
+    srv_cave_ok = (
+        hashlib.sha256(
+            so_bytes[srv_cave_off : srv_cave_off + ALEX_MARK_SERVER_CAVE_PATCHED_LEN]
+        ).hexdigest()
+        == ALEX_MARK_SERVER_CAVE_PATCHED_SHA256
+    )
     sites_ok = sum(
-        1 for site_va, _stock, hook_br in site_patches
-        if bytes(so_bytes[seg_offset(site_va):seg_offset(site_va) + 4]) == hook_br
+        1
+        for site_va, hook_br in ALEX_MARK_KIDS_PATCHED_SITES
+        if bytes(so_bytes[seg_offset(site_va) : seg_offset(site_va) + 4]) == hook_br
     )
 
     cli_cave_off = seg_offset(ALEX_MARK_CLIENT_CAVE_VADDR)
-    cli_cave_ok = bytes(so_bytes[cli_cave_off:cli_cave_off + len(client_cave)]) == client_cave
+    cli_cave_ok = (
+        hashlib.sha256(
+            so_bytes[cli_cave_off : cli_cave_off + ALEX_MARK_CLIENT_CAVE_PATCHED_LEN]
+        ).hexdigest()
+        == ALEX_MARK_CLIENT_CAVE_PATCHED_SHA256
+    )
     inst_off = seg_offset(ALEX_MARK_CLIENT_INSTALL_SITE)
-    inst_ok = bytes(so_bytes[inst_off:inst_off + 4]) == install_bl
+    inst_ok = bytes(so_bytes[inst_off : inst_off + 4]) == ALEX_MARK_CLIENT_INSTALL_PATCHED
 
-    ok = srv_cave_ok and sites_ok == len(site_patches) and cli_cave_ok and inst_ok
+    ok = srv_cave_ok and sites_ok == len(ALEX_MARK_KIDS_PATCHED_SITES) and cli_cave_ok and inst_ok
     detail = (
-        f"kIds sites={sites_ok}/{len(site_patches)}, "
+        f"kIds sites={sites_ok}/{len(ALEX_MARK_KIDS_PATCHED_SITES)}, "
         f"srv_cave={'ok' if srv_cave_ok else 'missing'}, "
         f"cli_cave={'ok' if cli_cave_ok else 'missing'}, "
         f"cli_hook={'ok' if inst_ok else 'missing'}"

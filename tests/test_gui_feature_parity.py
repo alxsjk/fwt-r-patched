@@ -220,3 +220,25 @@ def test_gui_option_vars_wire_all_features_and_preserve_exclusions(
             on_opts = window._collect_patch_options()
             validate_patch_options(on_opts)
             assert getattr(on_opts, feat.field) == enabled_val
+
+    # Every DEV_GROUPS variable must be assigned on MainWindow and wired to DevOptions.
+    import ast
+
+    tree = ast.parse(GUI.read_text(encoding="utf-8"))
+    assigned_attrs = {
+        target.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Attribute)
+        and isinstance(target.value, ast.Name)
+        and target.value.id == "self"
+    }
+    dev_fields = {f.name for f in dataclasses.fields(DevOptions)}
+    for group in DEV_GROUPS:
+        for feat in group.features:
+            assert feat.field.startswith("dev.")
+            dev_attr = feat.field.removeprefix("dev.")
+            assert dev_attr in dev_fields
+            if feat.variable:
+                assert feat.variable in assigned_attrs, f"Missing GUI var self.{feat.variable}"
