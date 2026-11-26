@@ -184,12 +184,17 @@ def test_unicorn_emulation_installer(
     ret_insn = struct.pack("<I", 0xD65F03C0)
     uc.mem_write(0x00AB575C, ret_insn)
 
-    handler_addr = CAVE_VADDR + 0x6C
+    handler_addr = CAVE_VADDR + 0x7C
     stub = struct.pack("<IIQ", 0x58000050, 0xD61F0200, handler_addr)
 
     events: list[str] = []
     state: dict[str, object] = {"helper_mode": "write"}
+    from unicorn.arm64_const import UC_ARM64_REG_X1
     sentinels = {
+        UC_ARM64_REG_X0: 0x0000000000000004,
+        UC_ARM64_REG_X1: 0xA1A1A1A1A1A1A1A1,
+        UC_ARM64_REG_X2: 0xB2B2B2B2B2B2B2B2,
+        UC_ARM64_REG_X3: 0xC3C3C3C3C3C3C3C3,
         UC_ARM64_REG_X19: 0xE5E5E5E5E5E5E5E5,
         UC_ARM64_REG_X20: 0xF6F6F6F6F6F6F6F6,
     }
@@ -298,7 +303,7 @@ def test_unicorn_runtime_gate_matrix() -> None:
     STOCK_GATE = IL2CPP_BASE + RVA_STOCK_GATE_CALL
     GET_INSTANCE = IL2CPP_BASE + RVA_GAME_STAGE_GET_INSTANCE
     GET_TURN = IL2CPP_BASE + RVA_GAME_STAGE_GET_TURN
-    handler_addr = CAVE_VADDR + 0x6C
+    handler_addr = CAVE_VADDR + 0x7C
 
     for addr, size in (
         (0x00B30000, 0x2000),

@@ -438,6 +438,8 @@ def test_lab_cylinder_x10(reference_buffers):
         "mana_cylinder_x10": 2,
         "no_win_box": 2,
         "hero_exp_cap": 4,
+        "convert_hex_guard": 2,
+        "dungeon_recom_info": 2,
     }
     hook_offset = GOLD_CYLINDER_X10_SITE - 0x4000
     assert result.so_bytes[hook_offset:hook_offset + 4] == encode_arm64_branch(
@@ -538,6 +540,8 @@ def test_equipment_single_mod_stone(reference_buffers):
         "equipment_single_mod_stone": 3,
         "no_win_box": 2,
         "hero_exp_cap": 4,
+        "convert_hex_guard": 2,
+        "dungeon_recom_info": 2,
     }
     server_offset = SINGLE_MOD_STONE_SERVER_SITE - 0x4000
     assert (
@@ -875,7 +879,13 @@ def test_guild_raid_score_fix_branches_and_caves(reference_buffers):
     result = apply_all_patches(
         so_bytes, dex_bytes, PatchOptions(guild_raid_score_fix=True)
     )
-    assert result.counts == {"guild_raid_score_fix": 2, "no_win_box": 2, "hero_exp_cap": 4}
+    assert result.counts == {
+        "guild_raid_score_fix": 2,
+        "no_win_box": 2,
+        "hero_exp_cap": 4,
+        "convert_hex_guard": 2,
+        "dungeon_recom_info": 2,
+    }
 
     start = result.so_bytes[
         GUILD_RAID_START_SITE - 0x4000:GUILD_RAID_START_SITE - 0x4000 + 8
@@ -918,6 +928,8 @@ def test_single_material_features_patch_exact_sites(reference_buffers):
         "single_gem_fang": 5,
         "no_win_box": 2,
         "hero_exp_cap": 4,
+        "convert_hex_guard": 2,
+        "dungeon_recom_info": 2,
     }
     assert (
         result.so_bytes[
@@ -954,7 +966,13 @@ def test_stamina_potion_1000_site(reference_buffers):
         dex_bytes,
         PatchOptions(stamina_potion_1000=True),
     )
-    assert result.counts == {"stamina_potion_1000": 1, "no_win_box": 2, "hero_exp_cap": 4}
+    assert result.counts == {
+        "stamina_potion_1000": 1,
+        "no_win_box": 2,
+        "hero_exp_cap": 4,
+        "convert_hex_guard": 2,
+        "dungeon_recom_info": 2,
+    }
     offset = STAMINA_POTION_1000_SITE - 0x4000
     assert result.so_bytes[offset:offset + len(STAMINA_POTION_1000_REPLACEMENT)] == (
         STAMINA_POTION_1000_REPLACEMENT
@@ -973,6 +991,8 @@ def test_coocoo_exp_x2_and_stamina_half_sites(reference_buffers):
         "stamina_cost_half": 1,
         "no_win_box": 2,
         "hero_exp_cap": 4,
+        "convert_hex_guard": 2,
+        "dungeon_recom_info": 2,
     }
     for site, replacement in (
         (COOCOO_EXP_X2_SITE, COOCOO_EXP_X2_REPLACEMENT),
@@ -1255,6 +1275,8 @@ def test_reference_all_patch_counts_and_egl_integrity(reference_buffers):
         "soulgear_enchant_always": 1,
         "no_win_box": 2,
         "hero_exp_cap": 4,
+        "convert_hex_guard": 2,
+        "dungeon_recom_info": 2,
         "rune_option_quality": 1,
         "event_coin_x10": 1,
         "guild_raid_score_fix": 2,
@@ -1345,6 +1367,8 @@ def test_reference_alternate_profile_and_no_cave_collisions(reference_buffers):
         "soulgear_enchant_always": 1,
         "no_win_box": 2,
         "hero_exp_cap": 4,
+        "convert_hex_guard": 2,
+        "dungeon_recom_info": 2,
         "rune_option_quality": 1,
         "gold_cylinder_x10": 2,
         "mana_cylinder_x10": 2,

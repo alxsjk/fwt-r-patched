@@ -22,6 +22,13 @@ def test_changelog_contains_current_release() -> None:
     assert "## [Unreleased]" in changelog
 
 
+def test_docs_and_readme_headers_match_app_version() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    catalog = (PROJECT_ROOT / "docs" / "FEATURE_CATALOG.md").read_text(encoding="utf-8")
+    assert APP_VERSION in readme.splitlines()[2]
+    assert APP_VERSION in catalog.splitlines()[2]
+
+
 def test_versioned_output_path_does_not_match_a_longer_version() -> None:
     # "2.5.250" contains "2.5.25" as a substring but is a different version.
     longer = Path(f"FWT-Reborn-Patched-{APP_VERSION}0.apk")

@@ -1,7 +1,7 @@
 """Builds the DUNGEON_RECOM_INFO handler cave, as AArch64 assembly.
 
 The stock embedded server never implements `DUNGEON_RECOM_INFO` (one of the
-protocol's empty "cascas"): the client asks for per-dungeon recommended friend
+protocol's empty stubs): the client asks for per-dungeon recommended friend
 mercenaries right before a battle (its `Result_DUNGEON_RECOM_INFO` parses
 `recom_list`), and the stub answers the generic
 `{"CMD":..,"packet_no":..,"ERROR":0,"msg":""}` ack with no list at all -- so

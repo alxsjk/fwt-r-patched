@@ -67,12 +67,16 @@ def canonicalize_segments(
     mappings. Virtual ranges must match the supported reference; file offsets
     are taken from the input's own PT_LOAD headers.
     """
+    if not reference:
+        raise ValueError("Reference ELF segment mapping cannot be empty")
     segments = read_load_segments(data)
     mappings = []
     for start, end, bias in reference:
+        if end <= start:
+            raise ValueError(f"Invalid ELF segment range {start:#x}..{end:#x}")
         source = translate_vaddr(segments, start, end - start)
         destination = start - bias
-        if destination + end - start > len(data):
+        if destination < 0 or destination + end - start > len(data):
             raise ValueError("Native library is too small for canonical mapping")
         mappings.append((destination, source, end - start))
     if mappings[0][1] != 0:
@@ -96,6 +100,8 @@ def project_segments(
     output = bytearray(original)
     previous = 0
     for dest, source, size in sorted(mappings):
+        if dest < previous:
+            raise ValueError("Overlapping canonical ELF segment mappings")
         if before[previous:dest] != after[previous:dest]:
             raise ValueError("Native patch changed bytes outside mapped PT_LOAD ranges")
         output[source:source + size] = after[dest:dest + size]

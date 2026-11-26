@@ -15,9 +15,9 @@ single hit. This patch swaps that one call site to the ABI-identical
 non-destructive ``GuildSkillEffect::GetMultiTarget`` (``0x1BAADB8``), so
 the shield ends only via the native turn expiry
 (``GuildSkillManager::OnEndTurnCamp`` → ``RemoveGuildSkillEffect``).
-Note: the decrypted dump at ``C:/tmp/fwt/handoff/libil2cpp.unido.so`` is
-a **0.683.1** image; the 0.682 GuildSkillEffect cluster lives at
-``0x1BA9xxx`` (as recorded in specs/009), not at the 0.683.1 layout.
+Note: the decrypted 0.683.1 reference dump puts this cluster at a different
+layout; the 0.682 GuildSkillEffect cluster lives at ``0x1BA9xxx`` (as recorded
+in ``specs/009``), not at the 0.683.1 layout.
 
 Delivery follows the established post-Covault runtime patch pattern, hooked
 mid-function at ``0xAB32F4`` (``mov w8, #1`` on the flow's common exit
@@ -27,7 +27,7 @@ fire-support site — every normal boot passes through this block), after
 the il2cpp base cache is written at ``0xAB0064`` and in the same pass
 where the neighboring client patches apply: the site is replaced by a
 linked ``bl`` into a self-healing installer cave at
-``0xB2AE18..0xB2AFDC`` (free tail of
+``0xB2AE18..0xB2AFC0`` (424 B, free tail of
 ``AbstractManglingParser::parseType``). The cave:
 
 1. logs what it sees (``ap_diag pre base=%p word=%08x`` via the author's

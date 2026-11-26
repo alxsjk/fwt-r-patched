@@ -20,7 +20,7 @@ and are no longer selectable in the CLI or GUI.
 - Added/changed: `gold_cylinder_x10`, `mana_cylinder_x10`; the client hooks for
   `single_gem_fang` (RVA `0x1DCACEC`) and the campaign/event shop client tables;
   `no_win_box` is now an unconditional bug fix.
-- The release line is still `--all` plus the numeric factors; at `2.5.35`, `--all` covered 50 active features. As of `2.5.54`, `--all` enables **59** selectable features (plus default 16 KB alignment and the always-on `no_win_box` and `hero_exp_cap` fixes; see [FEATURE_CATALOG.md](FEATURE_CATALOG.md)).
+- The release line is still `--all` plus the numeric factors; at `2.5.35`, `--all` covered 50 active features. As of `2.5.60`, `--all` enables **69** selectable features (plus default 16 KB alignment and the 4 always-on `no_win_box`, `hero_exp_cap`, `convert_hex_guard`, and `dungeon_recom_info` fixes; see [FEATURE_CATALOG.md](FEATURE_CATALOG.md)).
 
 ## Original hero modifications (12.01–12.03)
 
@@ -1353,7 +1353,7 @@ bootstrap's integrity contract must be updated in the same build:
 
 #### 60. `dungeon_recom_info` — Mercenary Auto-Select Recommendations (`DUNGEON_RECOM_INFO`)
 
-- The stock embedded server is one of the protocol's "cascas": it never
+- The stock embedded server is one of the protocol's empty stubs: it never
   implements `DUNGEON_RECOM_INFO`, answering the generic
   `{"CMD":..,"packet_no":..,"ERROR":0,"msg":""}` ack. The client's
   `Result_DUNGEON_RECOM_INFO` parses `recom_list` to rank candidate friend

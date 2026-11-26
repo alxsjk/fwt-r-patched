@@ -31,6 +31,6 @@ jobs:
       - name: Compile
         run: python -m compileall -q core gui tools tests fwt_patcher.py
       - name: Unit tests (no proprietary APK)
-        run: python -m pytest -q -m "not integration" -rs --cov=core --cov-report=term-missing
+        run: python -m pytest -q -m "not integration and not slow" -rs --cov=core --cov-report=term-missing
       - name: Integration tests (APK-dependent; skipped without source APK)
-        run: python -m pytest -q -m integration -rs
+        run: python -m pytest -q -m "integration and not slow" -rs

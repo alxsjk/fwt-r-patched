@@ -46,7 +46,7 @@ def _patch_gate(data: bytes) -> bytes:
     clone.update(_creatureId=_ALEX_FIVE, _creatureId2=_ALEX_SIX)
     rows.append(clone)
     objects[0].save_typetree(tree)
-    encoded = apk_tooling._encrypt_datatable(bytes(getattr(env.file, "save")()), key, iv)  # noqa: B009
+    encoded = apk_tooling._encrypt_datatable(bytes(getattr(env.file, "save")(packer="original")), key, iv)  # noqa: B009
     decoded, _, _ = apk_tooling._decrypt_datatable(encoded)
     found = [row for obj in UnityPy.load(decoded).objects if obj.type.name == "MonoBehaviour"
              for row in (obj.read_typetree().get("_data") or [])

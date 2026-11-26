@@ -182,9 +182,10 @@ def _push(adb: str, device: str | None, local: Path, remote: str, backup: Path) 
             f"refusing to overwrite existing backup {backup}; move it or pass a "
             "timestamped --output"
         )
-    with backup.open("wb") as fh:
-        result = subprocess.run(prefix + ["exec-out", "cat", remote], stdout=fh, timeout=30)
-    if result.returncode != 0 or backup.stat().st_size == 0:
+    if device and device.startswith("-"):
+        raise SystemExit(f"invalid adb device serial: {device!r}")
+    result = subprocess.run(prefix + ["pull", remote, str(backup)], capture_output=True, text=True, timeout=60)
+    if result.returncode != 0 or not backup.is_file() or backup.stat().st_size == 0:
         backup.unlink(missing_ok=True)
         raise SystemExit(
             f"could not back up {remote}; refusing to push and destroy the only copy"

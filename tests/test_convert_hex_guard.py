@@ -153,13 +153,15 @@ def test_unicorn_emulation_installer_and_hex_guard(
 
     uc.hook_add(UC_HOOK_CODE, hook_code)
 
-    # 1. Run installer at 0xAB3370; verify x1, x2 preserved and w3 = w20.
+    # 1. Run installer at 0xAB3370; verify x0, x1, x2 preserved and w3 = w20.
     uc.reg_write(UC_ARM64_REG_SP, STACK_TOP)
+    uc.reg_write(UC_ARM64_REG_X0, 4)
     uc.reg_write(UC_ARM64_REG_X1, 0x11112222)
     uc.reg_write(UC_ARM64_REG_X2, 0x33334444)
     uc.reg_write(UC_ARM64_REG_W20, 77)
     uc.emu_start(LATE_HOOK_SITE, 0x00AB3374 + 4)
     assert events == [("helper_installed", 0x0181178C)]
+    assert uc.reg_read(UC_ARM64_REG_X0) == 4
     assert uc.reg_read(UC_ARM64_REG_X1) == 0x11112222
     assert uc.reg_read(UC_ARM64_REG_X2) == 0x33334444
     assert uc.reg_read(UC_ARM64_REG_W3) == 77

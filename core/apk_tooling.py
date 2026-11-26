@@ -383,11 +383,14 @@ def locate_tools() -> ToolPaths:
             "/usr/bin/keytool",
         ]
     )
+    keytool_bin: Optional[str] = None
     java_home = os.environ.get("JAVA_HOME")
     if java_home:
-        keytool_patterns.insert(
-            0, os.path.join(java_home, "bin", "keytool.exe" if is_windows else "keytool")
-        )
+        jh_keytool = Path(java_home) / "bin" / ("keytool.exe" if is_windows else "keytool")
+        if jh_keytool.is_file():
+            keytool_bin = str(jh_keytool)
+    if keytool_bin is None:
+        keytool_bin = _find_binary("keytool.exe" if is_windows else "keytool", keytool_patterns)
 
     adb_patterns = [
         os.path.join(r, "platform-tools", "adb.exe" if is_windows else "adb")
@@ -397,7 +400,7 @@ def locate_tools() -> ToolPaths:
     return ToolPaths(
         zipalign=_find_binary("zipalign", zipalign_patterns),
         apksigner=_find_binary("apksigner.bat" if is_windows else "apksigner", apksigner_patterns),
-        keytool=_find_binary("keytool.exe" if is_windows else "keytool", keytool_patterns),
+        keytool=keytool_bin,
         adb=_find_binary("adb.exe" if is_windows else "adb", adb_patterns),
     )
 
@@ -739,6 +742,7 @@ def inspect_sacred_lands_assets(archive: zipfile.ZipFile) -> tuple[bool, str]:
 
     total_rows = 0
     graded_rows = 0
+    bundle_errors: list[str] = []
     for name in set_names:
         try:
             clear, _key, _iv = _decrypt_datatable(archive.read(name))
@@ -753,8 +757,11 @@ def inspect_sacred_lands_assets(archive: zipfile.ZipFile) -> tuple[bool, str]:
                     total_rows += 1
                     if int(row.get("_itemGrade", -1)) == SACRED_LANDS_ITEM_GRADE:
                         graded_rows += 1
-        except Exception:
-            continue
+        except Exception as exc:
+            bundle_errors.append(f"{Path(name).name}: {exc}")
+
+    if bundle_errors:
+        return False, "; ".join(bundle_errors)
 
     lists_found = 0
     list_name = "files/Resources/datatable/equipselectlist.unity3d"
@@ -2507,16 +2514,24 @@ def _patch_resources_zip_file(
             "Requested datatable patch(es) failed; refusing to emit a partially "
             "patched resource archive: " + " | ".join(failures)
         )
-    if not replacements:
+    if not replacements and not archive_additions:
         return raw_zip, None
     patched_path = work_dir / "fwt_resources_patched.zip"
-    _rewrite_zip_entries_to_file(raw_zip, replacements, patched_path)
+    if replacements:
+        _rewrite_zip_entries_to_file(raw_zip, replacements, patched_path)
+    else:
+        shutil.copyfile(raw_zip, patched_path)
     # Append new archive members (e.g., the Hero's Mark icon) after the rewrite
     # so they are included in the resource contract computation below.
     if archive_additions:
         with zipfile.ZipFile(patched_path, "a") as out:
+            existing_names = set(out.namelist())
             for name, data in archive_additions.items():
-                out.writestr(name, data, compress_type=zipfile.ZIP_STORED)
+                if name in existing_names:
+                    raise RuntimeError(f"Duplicate resource archive addition: {name}")
+                info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_STORED
+                out.writestr(info, data)
     return patched_path, ResourceContract.from_archive_path(patched_path)
 
 

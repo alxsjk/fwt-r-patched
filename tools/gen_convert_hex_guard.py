@@ -43,7 +43,7 @@ def generate() -> bytes:
     installer_entry:
         sub sp, sp, #0x50
         stp x29, x30, [sp, #0x40]
-        stp x19, x20, [sp, #0x30]
+        stp x19, x0, [sp, #0x30]
         stp x1, x2, [sp, #0x20]
         adrp x8, {page:#x}
         ldr x19, [x8, #{off:#x}]
@@ -65,7 +65,7 @@ def generate() -> bytes:
         bl {PATCH_IL2CPP_HELPER:#x}
     installer_done:
         ldp x1, x2, [sp, #0x20]
-        ldp x19, x20, [sp, #0x30]
+        ldp x19, x0, [sp, #0x30]
         ldp x29, x30, [sp, #0x40]
         add sp, sp, #0x50
         mov w3, w20

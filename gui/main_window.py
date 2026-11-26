@@ -151,14 +151,16 @@ class MainWindow(tk.Tk):
             pass
 
         # Paths (respect .env overrides while keeping project-relative defaults)
-        source_env = os.environ.get("FWT_SOURCE_APK", "source/fwt_0.682_offline_v1574.apk")
-        output_env = os.environ.get("FWT_OUTPUT_APK", "output/FWT-Reborn-Patched.apk")
-        keystore_env = os.environ.get("FWT_KEYSTORE", "keystore/fwt_reborn_lan.jks")
-        self.default_source = (self.project_root / source_env).expanduser()
+        def _resolve_env_path(key: str, default_rel: str) -> Path:
+            val = (os.environ.get(key) or default_rel).strip()
+            p = Path(val).expanduser()
+            return p if p.is_absolute() else (self.project_root / p)
+
+        self.default_source = _resolve_env_path("FWT_SOURCE_APK", "source/fwt_0.682_offline_v1574.apk")
         self.default_output = versioned_output_path(
-            (self.project_root / output_env).expanduser(), dev=False
+            _resolve_env_path("FWT_OUTPUT_APK", "output/FWT-Reborn-Patched.apk"), dev=False
         )
-        self.keystore_path = (self.project_root / keystore_env).expanduser()
+        self.keystore_path = _resolve_env_path("FWT_KEYSTORE", "keystore/fwt_reborn_lan.jks")
         self.backups_dir = self.project_root / "backups"
 
         # Tools & ADB
@@ -366,6 +368,7 @@ class MainWindow(tk.Tk):
         window.minsize(600, 420)
         window.configure(bg=BG_MAIN)
         window.transient(self)
+        window.grab_set()
 
         text = tk.Text(
             window,
@@ -1178,9 +1181,10 @@ class MainWindow(tk.Tk):
                         )
                     )
                 elif not enabled and is_dev_output_path(candidate):
-                    stem = candidate.stem[: -len(DEV_OUTPUT_SUFFIX)]
+                    import re
+                    cleaned = re.sub(r"-dev(?=$|-)", "", candidate.stem)
                     self.out_picker.var.set(
-                        str(candidate.with_name(f"{stem}-release{candidate.suffix}"))
+                        str(versioned_output_path(candidate.with_name(f"{cleaned}{candidate.suffix}"), dev=False))
                     )
 
     def _build_adb_section(self, parent: tk.Widget):
@@ -1838,20 +1842,25 @@ class MainWindow(tk.Tk):
             return
 
         lan_redirect = self.net_mode_var.get() == "lan"
-        server_ip = self.var_lan_ip.get().strip() or "127.0.0.1"
-        try:
-            server_port = int(self.var_lan_port.get().strip() or "8010")
-        except ValueError:
-            messagebox.showerror("Invalid LAN Port", "LAN port must be an integer between 1 and 65535.")
-            return
-        if not 1 <= server_port <= 65535:
-            messagebox.showerror("Invalid LAN Port", "LAN port must be between 1 and 65535.")
-            return
+        server_ip = "127.0.0.1"
+        server_port = 8010
         if lan_redirect:
+            server_ip = self.var_lan_ip.get().strip()
+            if not server_ip:
+                messagebox.showerror("Invalid LAN IP", "Enter the LAN server IPv4 address.")
+                return
             try:
                 ipaddress.IPv4Address(server_ip)
             except ValueError:
                 messagebox.showerror("Invalid LAN IP", f"Invalid IPv4 address: {server_ip!r}")
+                return
+            try:
+                server_port = int(self.var_lan_port.get().strip() or "8010")
+            except ValueError:
+                messagebox.showerror("Invalid LAN Port", "LAN port must be an integer between 1 and 65535.")
+                return
+            if not 1 <= server_port <= 65535:
+                messagebox.showerror("Invalid LAN Port", "LAN port must be between 1 and 65535.")
                 return
 
         force = self.var_force.get()
@@ -1864,21 +1873,24 @@ class MainWindow(tk.Tk):
             return
 
         try:
-            dev_options = DevOptions(
-                enabled=self.var_dev_enabled.get(),
-                debuggable=self.var_dev_debuggable.get(),
-                keep_version=self.var_dev_keep_version.get(),
-                log_dispatch=self.var_dev_log.get(),
-                log_body_limit=int(self.var_dev_log_limit.get().strip() or "0"),
-                log_commands=self.var_dev_log_commands.get().strip(),
-                hit_counters=self.var_dev_counters.get(),
-                build_marker=self.var_dev_marker.get(),
-                log_responses=self.var_dev_log_response.get(),
-                handler_timing=self.var_dev_timing.get(),
-                state_snapshots=self.var_dev_snapshots.get(),
-                dev_endpoint=self.var_dev_endpoint.get(),
-                lab_traps=self.var_lab_traps.get(),
-            )
+            if self.var_dev_enabled.get():
+                dev_options = DevOptions(
+                    enabled=True,
+                    debuggable=self.var_dev_debuggable.get(),
+                    keep_version=self.var_dev_keep_version.get(),
+                    log_dispatch=self.var_dev_log.get(),
+                    log_body_limit=int(self.var_dev_log_limit.get().strip() or "0"),
+                    log_commands=self.var_dev_log_commands.get().strip(),
+                    hit_counters=self.var_dev_counters.get(),
+                    build_marker=self.var_dev_marker.get(),
+                    log_responses=self.var_dev_log_response.get(),
+                    handler_timing=self.var_dev_timing.get(),
+                    state_snapshots=self.var_dev_snapshots.get(),
+                    dev_endpoint=self.var_dev_endpoint.get(),
+                    lab_traps=self.var_lab_traps.get(),
+                )
+            else:
+                dev_options = DevOptions()
             dev_options.validate()
         except ValueError as exc:
             messagebox.showerror("Dev options", str(exc))
@@ -1966,6 +1978,9 @@ class MainWindow(tk.Tk):
                 for warning in result.warnings:
                     self.log_viewer.log(f"WARNING: {warning}", "warn")
 
+                if self._cancel_event.is_set():
+                    raise RuntimeError("Build cancelled")
+
                 # 3. Verify output against the requested feature set.
                 self.log_viewer.log("Verifying generated APK...")
                 out_rep = inspect_apk(out_apk)
@@ -1988,6 +2003,9 @@ class MainWindow(tk.Tk):
                     f"DEX checksums={out_rep.dex_checksum_valid}",
                     "success",
                 )
+
+                if self._cancel_event.is_set():
+                    raise RuntimeError("Build cancelled")
 
                 # 4. Install via ADB if requested
                 if install_after and dev_id:

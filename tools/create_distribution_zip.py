@@ -150,6 +150,8 @@ def build_suite_zip(
                         continue
                     if p.suffix.lower() in EXCLUDE_EXTENSIONS or p.name.lower().endswith(".local.json"):
                         continue
+                    if p.name == ".env" or (p.name.startswith(".env.") and p.name != ".env.example"):
+                        continue
                     if p.is_symlink() or not p.is_file():
                         continue
                     if p.resolve() == output_path.resolve() or p.resolve() == temporary.resolve():
@@ -162,7 +164,11 @@ def build_suite_zip(
                 "Filename: fwt_0.682_offline_v1574.apk\n\n"
                 "Then run 'run_gui.bat' (Windows) or 'python fwt_patcher.py --gui'.\n"
             )
-            zf.writestr("fwt-reborn-suite/source/README.txt", readme_text)
+            readme_info = zipfile.ZipInfo("fwt-reborn-suite/source/README.txt", date_time=_FIXED_DATE)
+            readme_info.create_system = 3
+            readme_info.external_attr = 0o644 << 16
+            readme_info.compress_type = zipfile.ZIP_DEFLATED
+            zf.writestr(readme_info, readme_text)
 
             if include_patched_apk:
                 print(

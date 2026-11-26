@@ -69,9 +69,11 @@ def generate() -> bytes:
     off = IL2CPP_BASE_CACHE & 0xFFF
     src = f"""
     installer_entry:
-        sub sp, sp, #0x40
-        stp x29, x30, [sp, #0x30]
-        stp x19, x20, [sp, #0x20]
+        sub sp, sp, #0x60
+        stp x29, x30, [sp, #0x50]
+        stp x19, x20, [sp, #0x40]
+        stp x0, x1, [sp, #0x30]
+        stp x2, x3, [sp, #0x20]
         adrp x8, {page:#x}
         ldr x19, [x8, #{off:#x}]
         cbz x19, installer_done
@@ -91,9 +93,11 @@ def generate() -> bytes:
         adr x5, hook_name
         bl {PATCH_IL2CPP_HELPER:#x}
     installer_done:
-        ldp x19, x20, [sp, #0x20]
-        ldp x29, x30, [sp, #0x30]
-        add sp, sp, #0x40
+        ldp x2, x3, [sp, #0x20]
+        ldp x0, x1, [sp, #0x30]
+        ldp x19, x20, [sp, #0x40]
+        ldp x29, x30, [sp, #0x50]
+        add sp, sp, #0x60
         mov w4, w19
         ret
 

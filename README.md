@@ -1,6 +1,6 @@
 # FWT Reborn - Offline Client Patcher & Modding Suite
 
-**Version 2.5.58** · [Changelog](CHANGELOG.md) · [Technical documentation](docs/SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md) · [Contributing](CONTRIBUTING.md)
+**Version 2.5.60** · [Changelog](CHANGELOG.md) · [Technical documentation](docs/SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md) · [Contributing](CONTRIBUTING.md)
 
 Cross-platform desktop application (**Windows & Linux**) in Python for applying deterministic patches directly to the offline Korean APK of Fantasy War Tactics (**0.682 v1574**), eliminating the need to compile a separate server when playing 100% offline on a phone or emulator with all quality-of-life enhancements enabled.
 
@@ -48,7 +48,7 @@ The interface and the [complete feature catalog](docs/FEATURE_CATALOG.md) share 
 04. **Runes** — 04.01–04.05
 05. **Gems** — 05.01–05.05
 06. **Resources and upgrade costs** — 06.01–06.10
-07. **Battle Arena and Guild Raid** — 07.01–07.09
+07. **Battle Arena and Guild Raid** — 07.01–07.10
 08. **Language, network and build** — 08.01–08.08
 09. **Development: telemetry and controls** — 09.01–09.06
 10. **Development: tools** — 10.01–10.05
@@ -59,7 +59,7 @@ The interface and the [complete feature catalog](docs/FEATURE_CATALOG.md) share 
 
 The catalog lists each CLI flag, GUI variable and `PatchOptions` or `DevOptions` field, including summon alternatives, LAN mode, alignment, the always-on Coocoo fix and separate development controls. Feature 02.08 makes costume packages 3 and 4 award one copy of each eligible owned costume, collectable from shop mail, up to 10 purchases per package per day. Feature 03.11 makes one appropriate hammer finish the current equipment tier (+10 → +15, +15 → +20, +20 → +26), with the confirmation and stat preview showing the target. Descriptions, addresses and historical evidence remain in [PATCH_SPEC.md](docs/PATCH_SPEC.md), and custom Auto Mode AI targeting rules follow [AUTO_MODE_AI_GUIDE.md](docs/AUTO_MODE_AI_GUIDE.md).
 
-### Original hero modifications (12.01–12.02)
+### Original hero modifications (12.01–12.03)
 
 Feature 12.01 adds Alex's original 5★→6★ Awakening and Destiny Lance as an independent option in the **Original hero modifications** section and via `--alex-awakening` (also included in `--all`, incompatible with `--force`). See the [guide](docs/HERO_AWAKENING_GUIDE.md) for implementation details and validation notes.
 
@@ -186,7 +186,7 @@ In the window:
 4. Connect your ADB device (Wi-Fi or USB):
    - For a Wi-Fi emulator (e.g., MEmu/MuMu at `192.0.2.10:5555`), click **Connect IP** and enter `IP:Port`.
 5. Click:
-   - **Generate Patched APK Only**: Builds `output/FWT-Reborn-Patched-<version>-release.apk` (for example `FWT-Reborn-Patched-2.5.58-release.apk`) for manual sideloading. No ZIP wrapper is generated.
+   - **Generate Patched APK Only**: Builds `output/FWT-Reborn-Patched-<version>-release.apk` (for example `FWT-Reborn-Patched-2.5.60-release.apk`) for manual sideloading. No ZIP wrapper is generated.
    - **Generate & Install via ADB**: Backs up the save, builds the 16 KB-aligned signed APK, verifies the output, and installs it onto the device.
    - **Restore Save JSON...**: Restores a save backup (requires root).
    - **Uninstall App (wipes data)**: Removes the installed package to resolve signature conflicts; back up your save first.
@@ -233,7 +233,7 @@ the result is unknown: check the device before retrying.
 #### 1. Inspect an APK:
 ```bash
 python fwt_patcher.py --inspect source/fwt_0.682_offline_v1574.apk
-python fwt_patcher.py --inspect output/FWT-Reborn-Patched-2.5.58-release.apk
+python fwt_patcher.py --inspect output/FWT-Reborn-Patched-2.5.60-release.apk
 ```
 
 #### 2. Inspect a standalone `.so`:
@@ -279,7 +279,7 @@ python fwt_patcher.py --all --lan 192.0.2.20:8010 --output output/FWT_LAN.apk
 python tools/create_distribution_zip.py
 ```
 The archive is written as `output/FWT-Reborn-Patcher-Suite-<version>.zip`
-(for example `FWT-Reborn-Patcher-Suite-2.5.58.zip`). Custom `--output` names
+(for example `FWT-Reborn-Patcher-Suite-2.5.60.zip`). Custom `--output` names
 without the current version receive it automatically. No APK-only ZIP is
 generated; use `--apk-only` to stage/copy the versioned APK instead.
 

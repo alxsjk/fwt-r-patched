@@ -26,11 +26,24 @@ cleanup() {
 }
 trap cleanup EXIT
 
+for cmd in curl tar unzip sha256sum awk; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "ERROR: $cmd is required" >&2
+        exit 1
+    fi
+done
+
+case "$(uname -m)" in
+    x86_64|amd64) JDK_ARCH="x64" ;;
+    aarch64|arm64) JDK_ARCH="aarch64" ;;
+    *) echo "ERROR: unsupported architecture $(uname -m)" >&2; exit 1 ;;
+esac
+
 verify_sha256() {
     local file="$1"
     local expected="$2"
-    if ! command -v sha256sum >/dev/null 2>&1; then
-        echo "ERROR: sha256sum is required to verify $file" >&2
+    if [[ ! "$expected" =~ ^[0-9a-fA-F]{64}$ ]]; then
+        echo "ERROR: invalid SHA-256 format for $file: $expected" >&2
         exit 1
     fi
     printf '%s  %s\n' "$expected" "$file" | sha256sum -c -
@@ -39,17 +52,17 @@ verify_sha256() {
 mkdir -p "$HOME/tools" "$SDK_ROOT/cmdline-tools"
 
 if [ ! -x "$JDK_DIR/bin/java" ]; then
-    echo "Downloading Temurin JDK ${JDK_MAJOR}..."
+    echo "Downloading Temurin JDK ${JDK_MAJOR} (${JDK_ARCH})..."
     tmp="$(mktemp -d)"
     TMP_DIRS+=("$tmp")
-    curl -L --fail --silent --show-error \
+    curl --proto '=https' --tlsv1.2 -L --fail --silent --show-error \
         -o "$tmp/jdk.tar.gz" \
-        "https://api.adoptium.net/v3/binary/latest/${JDK_MAJOR}/ga/linux/x64/jdk/hotspot/normal/eclipse"
+        "https://api.adoptium.net/v3/binary/latest/${JDK_MAJOR}/ga/linux/${JDK_ARCH}/jdk/hotspot/normal/eclipse"
     expected_jdk_sha="$JDK_SHA256"
     if [ -z "$expected_jdk_sha" ]; then
-        curl -L --fail --silent --show-error \
+        curl --proto '=https' --tlsv1.2 -L --fail --silent --show-error \
             -o "$tmp/jdk.sha256" \
-            "https://api.adoptium.net/v3/checksum/latest/${JDK_MAJOR}/ga/linux/x64/jdk/hotspot/normal/eclipse"
+            "https://api.adoptium.net/v3/checksum/latest/${JDK_MAJOR}/ga/linux/${JDK_ARCH}/jdk/hotspot/normal/eclipse"
         expected_jdk_sha="$(awk 'NR == 1 { print $1 }' "$tmp/jdk.sha256")"
     fi
     if [ -z "$expected_jdk_sha" ]; then
@@ -66,16 +79,21 @@ export JAVA_HOME="$JDK_DIR"
 export PATH="$JAVA_HOME/bin:$PATH"
 
 if [ ! -x "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+    if [ -z "$CMDLINE_TOOLS_SHA256" ]; then
+        echo "ERROR: CMDLINE_TOOLS_SHA256 must be set to verify $CMDLINE_TOOLS_URL" >&2
+        exit 1
+    fi
     echo "Downloading Android command-line tools..."
     tmp="$(mktemp -d)"
     TMP_DIRS+=("$tmp")
-    curl -L --fail --silent --show-error -o "$tmp/cmdtools.zip" "$CMDLINE_TOOLS_URL"
-    if [ -n "$CMDLINE_TOOLS_SHA256" ]; then
-        verify_sha256 "$tmp/cmdtools.zip" "$CMDLINE_TOOLS_SHA256"
-    fi
+    curl --proto '=https' --tlsv1.2 -L --fail --silent --show-error -o "$tmp/cmdtools.zip" "$CMDLINE_TOOLS_URL"
+    verify_sha256 "$tmp/cmdtools.zip" "$CMDLINE_TOOLS_SHA256"
     unzip -q "$tmp/cmdtools.zip" -d "$tmp"
-    mkdir -p "$SDK_ROOT/cmdline-tools/latest"
-    mv "$tmp/cmdline-tools/"* "$SDK_ROOT/cmdline-tools/latest/"
+    rm -rf "$SDK_ROOT/cmdline-tools/latest.tmp"
+    mkdir -p "$SDK_ROOT/cmdline-tools/latest.tmp"
+    mv "$tmp/cmdline-tools/"* "$SDK_ROOT/cmdline-tools/latest.tmp/"
+    rm -rf "$SDK_ROOT/cmdline-tools/latest"
+    mv "$SDK_ROOT/cmdline-tools/latest.tmp" "$SDK_ROOT/cmdline-tools/latest"
 fi
 
 SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"

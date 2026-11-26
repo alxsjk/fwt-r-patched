@@ -16,6 +16,7 @@ patched.  Without that update a fresh install rejects the modified archive as
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -326,7 +327,8 @@ def ensure_apktool_jar(log_fn: Optional[Callable[[str], None]] = None) -> Path:
         if existing.parent == _cache_root():
             if log_fn:
                 log_fn(f"Cached apktool is corrupt ({digest}); re-downloading")
-            existing.unlink()
+            with contextlib.suppress(OSError):
+                existing.unlink()
         elif log_fn:
             log_fn(
                 f"Skipping {existing} (SHA-256 {digest} does not match pinned "
@@ -338,12 +340,18 @@ def ensure_apktool_jar(log_fn: Optional[Callable[[str], None]] = None) -> Path:
     if log_fn:
         log_fn(f"Downloading apktool {APKTOOL_VERSION} (one-time setup)...")
     request = urllib.request.Request(APKTOOL_URL, headers={"User-Agent": "fwt-re-patched"})
-    temporary = destination.with_suffix(".tmp")
+    with tempfile.NamedTemporaryFile(
+        dir=destination.parent,
+        prefix=f"{destination.stem}.",
+        suffix=".tmp",
+        delete=False,
+    ) as tmp_fh:
+        temporary = Path(tmp_fh.name)
     try:
         with urllib.request.urlopen(request, timeout=180) as response, temporary.open("wb") as out:
             shutil.copyfileobj(response, out)
-        digest = hashlib.sha256(temporary.read_bytes()).hexdigest()
-        if digest != APKTOOL_SHA256:
+        digest = _sha256_file(temporary).lower()
+        if digest != expected_sha:
             raise RuntimeError(
                 f"Downloaded apktool has unexpected SHA-256 {digest} "
                 f"(expected {APKTOOL_SHA256})"
@@ -364,14 +372,14 @@ def ensure_apktool_jar(log_fn: Optional[Callable[[str], None]] = None) -> Path:
 
 def find_java_executable() -> Optional[Path]:
     """Finds the Java runtime executable without failing when absent."""
-    java = shutil.which("java")
-    if java:
-        return Path(java)
     java_home = os.environ.get("JAVA_HOME")
     if java_home:
         candidate = Path(java_home) / "bin" / ("java.exe" if os.name == "nt" else "java")
         if candidate.is_file():
             return candidate
+    java = shutil.which("java")
+    if java:
+        return Path(java)
     return None
 
 

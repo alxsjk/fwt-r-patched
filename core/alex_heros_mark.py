@@ -276,6 +276,18 @@ def patch_soulgeartable_rows(rows: list[dict[str, Any]], locale_suffix: str) -> 
 
     existing = [r for r in rows if int(r.get("_soulgearId", -1)) == ALEX_MARK_SOULGEAR_ID]
     if existing:
+        if len(existing) != 1:
+            raise ValueError(f"soulgeartable{locale_suffix} has duplicate mark row {ALEX_MARK_SOULGEAR_ID}")
+        row = existing[0]
+        if (
+            int(row.get("_creatureId", -1)) != ALEX_CREATURE_ID
+            or int(row.get("_skillGroupId", -1)) != ALEX_MARK_SKILL_GROUP_ID
+            or int(row.get("_setgroupid", -1)) != ALEX_MARK_SET_GROUP_ID
+            or row.get("_icon") != ALEX_MARK_ICON
+            or row.get("_iconFolder") != ALEX_MARK_ICON_FOLDER
+            or row.get("_name") != ALEX_MARK_NAME
+        ):
+            raise ValueError(f"soulgeartable{locale_suffix} has conflicting row {ALEX_MARK_SOULGEAR_ID}")
         return 0
     # Find the Thanatos mark row (parts=3 donor) and clone it
     donor = next(
@@ -436,8 +448,11 @@ def patch_set_effect_rows(rows: list[dict[str, Any]]) -> int:
             "_effectString": "Final Power Up",
         }
 
-    # Effect 2: +10% Attack with >=1 ally — find any type-58 (APUpRate) row
+    # Effect 2: +10% Attack with >=1 ally — prefer DONOR_AP_UP_RATE, else any type-58 row
     donor2 = next(
+        (r for r in rows if int(r.get("_skillEffectId", -1)) == DONOR_AP_UP_RATE and int(r.get("_skillEffectType", -1)) == 58),
+        None,
+    ) or next(
         (r for r in rows if int(r.get("_skillEffectType", -1)) == 58),
         None,
     )
@@ -476,6 +491,7 @@ def patch_set_effect_rows(rows: list[dict[str, Any]]) -> int:
             "_effectDuplicate": 1,
             "_effectOverlap": 1,
             "_skillIcon": "D_SkillIcon_29",
+            "_effectIcon": "B_SkillIcon_58",
             "_effectFxPrefab": "ETC_Buff_01",
             "_dispelAllow": 255,
             "_effectString": "Attack Up",
@@ -517,12 +533,17 @@ def inspect_alex_heros_mark_assets(archive: zipfile.ZipFile) -> tuple[bool, str]
             all_ok = False
             details.append(f"{Path(path).name}: {err or 'no rows'}")
             continue
-        found = any(
-            int(r.get("_soulgearId", -1)) == ALEX_MARK_SOULGEAR_ID
+        found = [
+            r for r in rows
+            if int(r.get("_soulgearId", -1)) == ALEX_MARK_SOULGEAR_ID
+            and int(r.get("_creatureId", -1)) == ALEX_CREATURE_ID
+            and int(r.get("_skillGroupId", -1)) == ALEX_MARK_SKILL_GROUP_ID
+            and int(r.get("_setgroupid", -1)) == ALEX_MARK_SET_GROUP_ID
+            and r.get("_name") == ALEX_MARK_NAME
             and r.get("_icon") == ALEX_MARK_ICON
-            for r in rows
-        )
-        if found:
+            and r.get("_iconFolder") == ALEX_MARK_ICON_FOLDER
+        ]
+        if len(found) == 1:
             sg_ok += 1
         else:
             all_ok = False
@@ -542,10 +563,16 @@ def inspect_alex_heros_mark_assets(archive: zipfile.ZipFile) -> tuple[bool, str]
         matching = [
             r for r in rows
             if int(r.get("_groupId", -1)) == ALEX_MARK_SKILL_GROUP_ID
+            and int(r.get("_skillId", -1)) == DESTINY_LANCE_SKILL_ID
             and int(r.get("_effect01ExtravalueType", -1)) == OVERLAP_BOOST_TYPE
+            and _is_close(
+                r.get("_effect01Extravalue", 0.0),
+                _f32(OVERLAP_BOOST_PER_LEVEL * int(r.get("_equipLevel", -1))),
+            )
             and r.get("_desEquip") == overlap_description(int(r.get("_equipLevel", -1)))
         ]
-        if len(matching) == len(OVERLAP_LEVELS):
+        levels = {int(r.get("_equipLevel", -1)) for r in matching}
+        if len(matching) == len(OVERLAP_LEVELS) and levels == set(OVERLAP_LEVELS):
             ov_ok += 1
         else:
             all_ok = False
@@ -558,13 +585,13 @@ def inspect_alex_heros_mark_assets(archive: zipfile.ZipFile) -> tuple[bool, str]
         if path not in names:
             continue
         rows, _err = _read_datatable_rows(archive, path, label=Path(path).name)
-        found = rows is not None and any(
+        st_found = rows is not None and any(
             int(r.get("_setgroupid", -1)) == ALEX_MARK_SET_GROUP_ID
             and str(r.get("_setName")) == ALEX_MARK_NAME
             and int(r.get("_setSkillid01", -1)) == ALEX_SET_SKILL_ID
             for r in rows
         )
-        if found:
+        if st_found:
             st_ok += 1
     details.append(f"set row: {st_ok}/8 locales")
     if st_ok != 8:
@@ -580,8 +607,16 @@ def inspect_alex_heros_mark_assets(archive: zipfile.ZipFile) -> tuple[bool, str]
         rows, _err = _read_datatable_rows(archive, path, label=Path(path).name)
         if rows is None:
             continue
+        expected_skill = build_set_skill_row()
         ours = next((r for r in rows if int(r.get("_skillId", -1)) == ALEX_SET_SKILL_ID), None)
-        if ours is not None and str(ours.get("_tooltip")) == str(build_set_skill_row()["_tooltip"]):
+        if (
+            ours is not None
+            and str(ours.get("_tooltip")) == str(expected_skill["_tooltip"])
+            and int(ours.get("_effect01", -1)) == int(expected_skill["_effect01"])
+            and int(ours.get("_effect02", -1)) == int(expected_skill["_effect02"])
+            and int(ours.get("_skillTarget", -1)) == int(expected_skill["_skillTarget"])
+            and int(ours.get("_skillType", -1)) == int(expected_skill["_skillType"])
+        ):
             sd_ok += 1
         for r in rows:
             if int(r.get("_skillId", -1)) == DESTINY_LANCE_SKILL_ID:
@@ -919,18 +954,33 @@ hook_name:
     return install_bl, cave_bytes
 
 
+ALEX_MARK_SERVER_CAVE_ORIGINAL_SHA256 = (
+    "ad1c13351f18ce248377e3e225dd392120372470b5be28c810d7f4fdfabe4055"
+)
+ALEX_MARK_CLIENT_CAVE_ORIGINAL_SHA256 = (
+    "be899379ce885fe579ba1732c6bf2e12255124175da9cc0b447e515a48e22989"
+)
+
+
 def apply_alex_heros_mark_so(
     so_buf: bytearray,
     seg_offset: Any,
 ) -> int:
     """Apply server kIds cave + client Lv10 cooltime hook to libfwt_local_server.so."""
+    import hashlib
+
     site_patches, server_cave = build_alex_heros_mark_server_cave()
     install_bl, client_cave = build_alex_heros_mark_client_cave()
 
+    states: list[str] = []
     for site_va, stock_br, hook_br in site_patches:
-        off = seg_offset(site_va)
+        off = seg_offset(site_va, 4) if _accepts_size(seg_offset) else seg_offset(site_va)
         cur = bytes(so_buf[off:off + 4])
-        if cur not in (stock_br, hook_br):
+        if cur == stock_br:
+            states.append("stock")
+        elif cur == hook_br:
+            states.append("patched")
+        else:
             raise ValueError(
                 f"Unexpected bytes at kIds site {site_va:#x}: {cur.hex()} "
                 f"(expected {stock_br.hex()})"
@@ -938,32 +988,61 @@ def apply_alex_heros_mark_so(
 
     inst_off = seg_offset(ALEX_MARK_CLIENT_INSTALL_SITE)
     cur_inst = bytes(so_buf[inst_off:inst_off + 4])
-    if cur_inst not in (ALEX_MARK_CLIENT_INSTALL_STOCK, install_bl):
+    if cur_inst == ALEX_MARK_CLIENT_INSTALL_STOCK:
+        states.append("stock")
+    elif cur_inst == install_bl:
+        states.append("patched")
+    else:
         raise ValueError(
             f"Unexpected bytes at client install site {ALEX_MARK_CLIENT_INSTALL_SITE:#x}: "
             f"{cur_inst.hex()} (expected {ALEX_MARK_CLIENT_INSTALL_STOCK.hex()})"
         )
 
-    applied = 0
     srv_cave_off = seg_offset(ALEX_MARK_SERVER_CAVE_VADDR)
-    if bytes(so_buf[srv_cave_off:srv_cave_off + len(server_cave)]) != server_cave:
-        so_buf[srv_cave_off:srv_cave_off + len(server_cave)] = server_cave
-        applied += 1
-    for site_va, _stock_br, hook_br in site_patches:
-        off = seg_offset(site_va)
-        if bytes(so_buf[off:off + 4]) != hook_br:
-            so_buf[off:off + 4] = hook_br
-            applied += 1
+    cur_srv_cave = bytes(so_buf[srv_cave_off:srv_cave_off + len(server_cave)])
+    if cur_srv_cave == server_cave:
+        states.append("patched")
+    elif hashlib.sha256(cur_srv_cave).hexdigest() == ALEX_MARK_SERVER_CAVE_ORIGINAL_SHA256:
+        states.append("stock")
+    else:
+        raise ValueError("Unexpected bytes in Alex's Hero's Mark server cave")
 
     cli_cave_off = seg_offset(ALEX_MARK_CLIENT_CAVE_VADDR)
-    if bytes(so_buf[cli_cave_off:cli_cave_off + len(client_cave)]) != client_cave:
-        so_buf[cli_cave_off:cli_cave_off + len(client_cave)] = client_cave
-        applied += 1
-    if cur_inst != install_bl:
-        so_buf[inst_off:inst_off + 4] = install_bl
+    cur_cli_cave = bytes(so_buf[cli_cave_off:cli_cave_off + len(client_cave)])
+    if cur_cli_cave == client_cave:
+        states.append("patched")
+    elif hashlib.sha256(cur_cli_cave).hexdigest() == ALEX_MARK_CLIENT_CAVE_ORIGINAL_SHA256:
+        states.append("stock")
+    else:
+        raise ValueError("Unexpected bytes in Alex's Hero's Mark client cave")
+
+    if len(set(states)) != 1:
+        raise ValueError("Unexpected or partially patched Alex's Hero's Mark native code")
+    if states[0] == "patched":
+        return 0
+
+    applied = 0
+    so_buf[srv_cave_off:srv_cave_off + len(server_cave)] = server_cave
+    applied += 1
+    for site_va, _stock_br, hook_br in site_patches:
+        off = seg_offset(site_va)
+        so_buf[off:off + 4] = hook_br
         applied += 1
 
+    so_buf[cli_cave_off:cli_cave_off + len(client_cave)] = client_cave
+    applied += 1
+    so_buf[inst_off:inst_off + 4] = install_bl
+    applied += 1
+
     return applied
+
+
+def _accepts_size(seg_offset: Any) -> bool:
+    import inspect
+    try:
+        return len(inspect.signature(seg_offset).parameters) >= 2
+    except (TypeError, ValueError):
+        return False
 
 
 def inspect_alex_heros_mark_so(

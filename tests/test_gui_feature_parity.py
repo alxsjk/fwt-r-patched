@@ -25,10 +25,7 @@ GUI = Path(__file__).resolve().parent.parent / "gui" / "main_window.py"
 CATALOG_DOC = GUI.parent.parent / "docs" / "FEATURE_CATALOG.md"
 
 # Options that are build plumbing rather than features (paths, toggles handled elsewhere).
-PIPELINE_FIELDS = {
-    "input_apk",
-    "output_apk",
-}
+PIPELINE_FIELDS: set[str] = set()
 
 
 class _FakeBoolVar:
@@ -210,79 +207,16 @@ def test_gui_option_vars_wire_all_features_and_preserve_exclusions(
         validate_patch_options(window._collect_patch_options())
 
     # Toggling each GUI option variable updates its exact PatchOptions field.
-    var_to_field: list[tuple[str, str, object]] = [
-        ("var_gold", "campaign_gold", True),
-        ("var_xp", "campaign_xp", True),
-        ("var_no_equip_drops", "no_equip_drops", True),
-        ("var_gene", "gene_priority", True),
-        ("var_summon", "summon_rates", True),
-        ("var_summon_50_30_20", "summon_rates_50_30_20", True),
-        ("var_expedition", "expedition_bonus", True),
-        ("var_english", "english_localization", True),
-        ("var_event_discount", "event_discount", True),
-        ("var_event_gene_unlimited", "event_gene_unlimited", True),
-        ("var_event_limits_daily", "event_limits_daily", True),
-        ("var_mythical_stone_shop", "mythical_stone_shop", True),
-        ("var_hero_shop_offers", "hero_shop_offers", True),
-        ("var_surprise_transcendence_package", "surprise_transcendence_package", True),
-        ("var_costume_packages_all", "costume_packages_all", True),
-        ("var_recycle_six_star", "recycle_six_star", True),
-        ("var_campaign_shop_discount", "campaign_shop_discount", True),
-        ("var_mode_drops_x10", "mode_drops_x10", True),
-        ("var_devil_boost_x10", "devil_boost_x10", True),
-        ("var_battle_arena_fix", "battle_arena_fix", True),
-        ("var_guild_raid_mercenary", "guild_raid_mercenary", True),
-        ("var_guild_raid_reward_x10", "guild_raid_reward_x10", True),
-        ("var_energy_flask_x10", "energy_flask_x10", True),
-        ("var_option_max_attributes", "option_max_attributes", True),
-        ("var_rune_box_random_type", "rune_box_random_type", True),
-        ("var_rune_box_random_roll", "rune_box_random_roll", True),
-        ("var_equipment_lock_fix", "equipment_lock_fix", True),
-        ("var_equipment_single_mod_stone", "equipment_single_mod_stone", True),
-        ("var_equipment_percent_options", "equipment_percent_options", True),
-        ("var_equipment_upgrade_10_guarantee", "equipment_upgrade_10_guarantee", True),
-        ("var_soulgear_enchant_always", "soulgear_enchant_always", True),
-        ("var_rune_quality_x10", "rune_quality_factor", 10),
-        ("var_rune_option_quality", "rune_option_quality", True),
-        ("var_gold_cylinder_x10", "gold_cylinder_x10", True),
-        ("var_mana_cylinder_x10", "mana_cylinder_x10", True),
-        ("var_event_coin_x10", "event_coin_x10", True),
-        ("var_guild_raid_score_fix", "guild_raid_score_fix", True),
-        ("var_guild_raid_fire_support", "guild_raid_fire_support", True),
-        ("var_guild_raid_protection_persist", "guild_raid_protection_persist", True),
-        ("var_guild_raid_skills_max", "guild_raid_skills_max", True),
-        ("var_guild_raid_boss_no_counter", "guild_raid_boss_no_counter", True),
-        ("var_single_black_hammer", "single_black_hammer", True),
-        ("var_single_gem_fang", "single_gem_fang", True),
-        ("var_upgrade_no_fail_above_20", "upgrade_no_fail_above_20", True),
-        ("var_battle_arena_save_fix", "battle_arena_save_fix", True),
-        ("var_sacred_lands_restore", "sacred_lands_restore", True),
-        ("var_coocoo_exp_x2", "coocoo_exp_x2", True),
-        ("var_coocoo_level_x2", "coocoo_level_x2", True),
-        ("var_ship_parts_90_off", "ship_parts_90_off", True),
-        ("var_worldboss_full_ship_repair", "worldboss_full_ship_repair", True),
-        ("var_crystal_skill_90_off", "crystal_skill_90_off", True),
-        ("var_gem_mining_x10", "gem_mining_x10", True),
-        ("var_gem_mining_types", "gem_mining_types", True),
-        ("var_gem_level6", "gem_level6", True),
-        ("var_gem_upgrade_gold_half", "gem_upgrade_gold_half", True),
-        ("var_stamina_cost_half", "stamina_cost_half", True),
-        ("var_stamina_potion_1000", "stamina_potion_1000", True),
-        ("var_align_16k", "align_16k", True),
-        ("var_alex_rebalance", "alex_rebalance", True),
-        ("var_trait_max_quality", "trait_max_quality", True),
-        ("var_trait_allow_duplicates", "trait_allow_duplicates", True),
-        ("var_trait_multi_unique", "trait_multi_unique", True),
-        ("var_trait_immunity_weight_x2", "trait_immunity_weight_x2", True),
-        ("var_limit_break_step_10", "limit_break_step_10", True),
-        ("var_merlin_auto_support", "merlin_auto_support", True),
-    ]
-    for var_attr, field_name, enabled_val in var_to_field:
-        var = getattr(window, var_attr)
-        var.set(False)
-        off_opts = window._collect_patch_options()
-        assert getattr(off_opts, field_name) in (False, 0)
-        var.set(True)
-        on_opts = window._collect_patch_options()
-        validate_patch_options(on_opts)
-        assert getattr(on_opts, field_name) == enabled_val
+    for group in FEATURE_GROUPS:
+        for feat in group.features:
+            if not feat.variable or not feat.field:
+                continue
+            enabled_val: object = 10 if feat.field == "rune_quality_factor" else True
+            var = getattr(window, feat.variable)
+            var.set(False)
+            off_opts = window._collect_patch_options()
+            assert getattr(off_opts, feat.field) in (False, 0)
+            var.set(True)
+            on_opts = window._collect_patch_options()
+            validate_patch_options(on_opts)
+            assert getattr(on_opts, feat.field) == enabled_val

@@ -20,10 +20,12 @@ keystore/
 
 # Source APKs and proprietary binary assets (user-supplied)
 source/
-*.apk
 *.so
 *.dex
 *.dat
+*.unity3d
+*.ab
+*.arsc
 
 # Downloaded toolchain jars (apktool is fetched on first use)
 tools/*.jar
@@ -35,6 +37,7 @@ tools/*.jar
 
 # Python tooling / virtual environments
 .venv/
+.venv*/
 venv/
 .pytest_cache/
 .ruff_cache/

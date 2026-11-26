@@ -1,6 +1,6 @@
 # Grouped Feature Catalog
 
-This is the canonical index of GUI feature numbers for FWT Reborn Patch 2.5.58. The same IDs appear in the graphical interface. For code locations, byte sequences and validation history, see [PATCH_SPEC.md](PATCH_SPEC.md).
+This is the canonical index of GUI feature numbers for FWT Reborn Patch 2.5.60. The same IDs appear in the graphical interface. For code locations, byte sequences and validation history, see [PATCH_SPEC.md](PATCH_SPEC.md).
 
 IDs are stable references, not positions: never renumber or reuse an ID. If a feature moves to another group, keep its existing ID; its prefix identifies the group in which it was first assigned. Add new items with a new number in the relevant group and update `gui/feature_catalog.py` and this catalog together. The parity tests verify the mapping.
 
@@ -31,7 +31,7 @@ IDs are stable references, not positions: never renumber or reuse an ID. If a fe
 | 02.04 | Unlimited event shop genes | `--event-gene-unlimited` | `event_gene_unlimited` | `var_event_gene_unlimited` | Yes |
 | 02.05 | Daily event shop limits | `--event-limits-daily` | `event_limits_daily` | `var_event_limits_daily` | Yes |
 | 02.06 | Campaign shop 90% discount (including valid category-6 coin prices) | `--campaign-shop-discount` | `campaign_shop_discount` | `var_campaign_shop_discount` | Yes |
-| 02.07 | Mythical Stone in Event Shop | `--mythical-stone-shop` | `mythical_stone_shop` | `var_mythical_stone_shop` | Yes (see [KB-001](KNOWN_BUGS.md)) |
+| 02.07 | Mythical Stone in Event Shop | `--mythical-stone-shop` | `mythical_stone_shop` | `var_mythical_stone_shop` | Yes ([KB-001](KNOWN_BUGS.md), resolved in 2.5.55) |
 | 02.08 | Complete Costume Packages: one copy of each eligible owned costume; each package up to 10 times daily | `--costume-packages-all` | `costume_packages_all` | `var_costume_packages_all` | Yes |
 | 02.09 | Evan and Alex Shop Offers: unlimited genes (5 event coins / 1 medal); Honor Shop 100 Diamonds | `--hero-shop-offers` | `hero_shop_offers` | `var_hero_shop_offers` | Yes |
 | 02.10 | Surprise Transcendence Package 2 (10 Ultimate and 10 Universal tickets for 500 diamonds) | `--surprise-transcendence-package` | `surprise_transcendence_package` | `var_surprise_transcendence_package` | Yes |
@@ -144,6 +144,8 @@ See the [Awakening guide](HERO_AWAKENING_GUIDE.md), [Skill rebalance guide](SKIL
 | ID | Feature | CLI | PatchOptions field | GUI variable | `--all` |
 |---|---|---|---|---|---|
 | 14.01 | Merlin Slot-1 Auto Mode: Awake, then Magic infusion (strongest Awakening first), before bonus or item cells | `--merlin-auto-support` | `merlin_auto_support` | `var_merlin_auto_support` | Yes |
+
+*Note: Historical sub-IDs `14.02` (prioritize skills before bonus/item cells) and `14.03` (strongest-Awakening damage tie-break) are bundled into `14.01` (`--merlin-auto-support`) and reserved against reuse.*
 
 ## Development options
 

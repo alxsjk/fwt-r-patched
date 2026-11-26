@@ -41,8 +41,7 @@ MPROTECT = 0xB476D0
 CACHE_FLUSH = 0xB41794
 
 # Reference 0.682 v1574 client RVAs (verified live: the decrypted pages of the
-# running process at base 0x400022200000; C:/tmp/fwt/handoff/libil2cpp.unido.so
-# is a 0.683.1 dump and must NOT be used for 0.682 addresses).
+# running process; the 0.683.1 dump must NOT be used for 0.682 addresses).
 CLIENT_RVA = 0x1877C60  # bl RemoveMultiTarget inside UseDamageReduceEffect
 REMOVE_MULTI_TARGET = 0x1BAAEBC
 GET_MULTI_TARGET = 0x1BAADB8

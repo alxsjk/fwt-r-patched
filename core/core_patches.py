@@ -2308,8 +2308,13 @@ class DevOptions:
                 f"dev instrumentation ({names}) requires the dev master switch; "
                 "pass --dev (CLI) or enable the Development card (GUI)."
             )
-        if self.log_body_limit < 0:
-            raise ValueError("dev log_body_limit must be >= 0 (0 logs whole bodies)")
+        if not self.enabled and (self.keep_version or self.log_commands.strip()):
+            raise ValueError(
+                "dev options (keep_version / log_commands) require the dev master switch; "
+                "pass --dev (CLI) or enable the Development card (GUI)."
+            )
+        if self.log_body_limit < 0 or self.log_body_limit > 0xFFFF:
+            raise ValueError("dev log_body_limit must be between 0 and 65535")
 
 
 @dataclass
@@ -3660,7 +3665,6 @@ def validate_cave_layout() -> None:
     # bytes within Alex's client and server integration regions.
     common_ranges.append(("alex_awakening_client", 0xB2EA8C, 0xB2FAA0))
     common_ranges.append(("alex_awakening_server", 0xB34D44, 0xB34F50))
-    common_ranges.append(("alex_awakening_scratch", 0xBE6268, 0xBE62C8))
 
     common_ranges.append((
         "randoption_table",
@@ -3784,12 +3788,6 @@ def validate_cave_layout() -> None:
         GUILD_RAID_SKILL_TURN_GATE_CAVE_VADDR + GUILD_RAID_SKILL_TURN_GATE_CAVE_SIZE,
     ))
     common_ranges.append((
-        "guild_raid_skill_turn_gate_state",
-        GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_VADDR,
-        GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_VADDR
-        + GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_SIZE,
-    ))
-    common_ranges.append((
         "alex_heros_mark_server",
         ALEX_MARK_SERVER_CAVE_VADDR,
         ALEX_MARK_SERVER_CAVE_VADDR + ALEX_MARK_SERVER_CAVE_SIZE,
@@ -3890,6 +3888,13 @@ def validate_cave_layout() -> None:
             "battle_arena_client_base",
             BATTLE_ARENA_SAVE_CLIENT_BASE_GLOBAL,
             BATTLE_ARENA_SAVE_CLIENT_BASE_GLOBAL + 8,
+        ),
+        ("alex_awakening_scratch", 0xBE6268, 0xBE62C8),
+        (
+            "guild_raid_skill_turn_gate_state",
+            GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_VADDR,
+            GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_VADDR
+            + GUILD_RAID_SKILL_TURN_GATE_STATE_SLOT_SIZE,
         ),
         # Reserved ELF .data globals bordering our scratch slots
         ("g_manual_setequip_rotation_pair", 0xBE2CB8, 0xBE2CBC),
@@ -4529,18 +4534,19 @@ def apply_lan_redirect(
     if struct.unpack_from("<I", shim_buf, 8)[0] != SHIM_MAGIC:
         raise ValueError("Embedded LAN shim magic does not match SHIM_MAGIC")
     shim_off = seg_offset(SHIM_VADDR)
-    shim_already = (
-        len(buf) >= shim_off + 12
-        and struct.unpack_from("<I", buf, shim_off + 8)[0] == SHIM_MAGIC
-    )
     shim_buf[12:16] = packed_ip
     struct.pack_into(">H", shim_buf, 16, port)
     struct.pack_into("<H", shim_buf, 18, 1 if force_english else 0)
     struct.pack_into("<I", shim_buf, 20, 0)
+    target_shim = bytes(shim_buf)
+    shim_already = (
+        len(buf) >= shim_off + len(target_shim)
+        and bytes(buf[shim_off:shim_off + len(target_shim)]) == target_shim
+    )
 
     replacements = {
         0xAAD9F8: encode_arm64_branch(0xAAD9F8, SHIM_VADDR + 4, link=False),
-        0xAA6D70: LOOPBACK_CONNECT_STUB[:4],
+        0xAA6D70: LOOPBACK_CONNECT_STUB,
         0xAB5D48: encode_arm64_branch(0xAB5D48, 0xAA6D2C, link=True),
         0xAAE450: ARM64_RET,
         0xAADE84: ARM64_MOV_W0_1,
@@ -4548,16 +4554,34 @@ def apply_lan_redirect(
     }
     for address, replacement in replacements.items():
         offset = seg_offset(address)
-        current = bytes(buf[offset:offset + 4])
+        current = bytes(buf[offset:offset + len(replacement)])
         original = LAN_SITE_ORIGINALS[address]
-        if current not in (original, replacement):
+        if address == 0xAA6D70:
+            if current[:4] not in (original, replacement[:4]):
+                raise ValueError(
+                    f"Unexpected instruction at LAN site 0x{address:x}: {current[:4].hex()} "
+                    f"(expected {original.hex()} or {replacement[:4].hex()})"
+                )
+        elif current not in (original, replacement):
             raise ValueError(
                 f"Unexpected instruction at LAN site 0x{address:x}: {current.hex()} "
                 f"(expected {original.hex()} or {replacement.hex()})"
             )
 
+    sites_already = all(
+        bytes(buf[seg_offset(address):seg_offset(address) + len(replacement)]) == replacement
+        for address, replacement in replacements.items()
+    ) and all(
+        bytes(buf[seg_offset(address):seg_offset(address) + 4]) == ARM64_NOP
+        for address in SERVER_SPAWN_BL_VADDRS
+    )
+    dex_already = all(
+        bytes(dex_buf[offset:offset + length]) == bytes(length)
+        for offset, length in LAN_DEX_BACKUP_PATCHES
+    )
+
     # 1. Inject shim into unused HTTP server body
-    _write_bytes(buf, seg_offset(SHIM_VADDR), bytes(shim_buf), "LAN shim")
+    _write_bytes(buf, seg_offset(SHIM_VADDR), target_shim, "LAN shim")
 
     # 2. Early network boundary hook to run Locale.setDefault(Locale.US)
     _write_bytes(buf, seg_offset(0xAAD9F8), replacements[0xAAD9F8], "LAN boundary hook")
@@ -4609,18 +4633,6 @@ def apply_lan_redirect(
                 )
             dex_buf[offset:offset + length] = patched
     recalculate_dex_hashes(dex_buf)
-    sites_already = all(
-        bytes(buf[seg_offset(address):seg_offset(address) + len(replacement)])
-        == replacement
-        for address, replacement in replacements.items()
-    ) and all(
-        bytes(buf[seg_offset(address):seg_offset(address) + 4]) == ARM64_NOP
-        for address in SERVER_SPAWN_BL_VADDRS
-    )
-    dex_already = all(
-        bytes(dex_buf[offset:offset + length]) == bytes(length)
-        for offset, length in LAN_DEX_BACKUP_PATCHES
-    )
     return 0 if shim_already and sites_already and dex_already else 1
 
 
@@ -7431,6 +7443,18 @@ def apply_guild_raid_reward_x10(buf: bytearray) -> int:
 def validate_patch_options(options: PatchOptions) -> None:
     """Validate mutually exclusive feature combinations in ``PatchOptions``."""
     options.dev.validate()
+
+    if options.rune_quality_factor < 0:
+        raise ValueError("rune_quality_factor must be >= 0")
+
+    if options.lan_redirect:
+        import ipaddress
+        try:
+            ipaddress.IPv4Address(options.server_ip.strip())
+        except ValueError as exc:
+            raise ValueError(f"Invalid LAN IPv4 address: {options.server_ip!r}") from exc
+        if not 1 <= options.server_port <= 65535:
+            raise ValueError(f"LAN port must be between 1 and 65535 (got {options.server_port})")
 
     if options.alex_awakening and options.allow_unknown:
         raise ValueError("Alex Awakening requires the exact reference build; --force is unsupported.")

@@ -20,26 +20,24 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # - stamina_cashback is intentionally a no-op stub blocked by verify_report
 _NON_FEATURE_FIELDS = frozenset(
     {
-        "input_apk",
-        "output_apk",
         "server_ip",
         "server_port",
         "dev",
         "align_16k",
         "allow_unknown",
-        "stamina_cashback",
         "lan_redirect",
     }
 )
 
 # Non-boolean feature fields enabled with a representative positive scale value.
 _INTEGER_FEATURE_SCALES: dict[str, int] = {
-    "equipment_option_factor": 10,
     "rune_quality_factor": 10,
 }
 
 
 def test_every_feature_patch_option_is_verifiable() -> None:
+    actual_fields = {item.name for item in fields(PatchOptions)}
+    assert (_NON_FEATURE_FIELDS | set(_INTEGER_FEATURE_SCALES)) <= actual_fields
     kwargs: dict[str, object] = {}
     feature_fields: set[str] = set()
     for item in fields(PatchOptions):
@@ -95,6 +93,12 @@ def test_limit_break_profile_reconciliation_gates_verify_report() -> None:
             status="Active",
             details="always-on bug fix",
         ),
+        "dungeon_recom_info": FeatureReport(
+            name="dungeon_recom_info",
+            active=True,
+            status="Active",
+            details="always-on bug fix",
+        ),
     }
     _reconcile_limit_break_reports(
         features,
@@ -114,7 +118,9 @@ def test_limit_break_profile_reconciliation_gates_verify_report() -> None:
     )
     opts = PatchOptions(limit_break_cost_tenth=True)
     problems = verify_report(mismatch_report, opts)
-    assert problems, "verify_report accepted mismatched client table"
+    assert any("Limit Break" in p or profile_key in p for p in problems), (
+        f"verify_report did not flag limit-break mismatch: {problems}"
+    )
 
     matching = {
         profile_key: FeatureReport(
@@ -122,7 +128,11 @@ def test_limit_break_profile_reconciliation_gates_verify_report() -> None:
             active=True,
             status="Patched",
             details="SO patched",
-        )
+        ),
+        "no_win_box": features["no_win_box"],
+        "hero_exp_cap": features["hero_exp_cap"],
+        "convert_hex_guard": features["convert_hex_guard"],
+        "dungeon_recom_info": features["dungeon_recom_info"],
     }
     _reconcile_limit_break_reports(
         matching,
@@ -130,6 +140,16 @@ def test_limit_break_profile_reconciliation_gates_verify_report() -> None:
         client_details="limitbreakcost patched",
     )
     assert matching[profile_key].active is True
+    matching_report = InspectionReport(
+        is_valid_apk=True,
+        has_so=True,
+        has_dex=True,
+        alignment_16k=True,
+        is_signed=True,
+        dex_checksum_valid=True,
+        features=matching,
+    )
+    assert verify_report(matching_report, opts) == []
 
 
 def _version_key(version: str) -> tuple[int, ...]:

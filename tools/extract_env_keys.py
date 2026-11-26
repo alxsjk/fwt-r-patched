@@ -187,6 +187,7 @@ def update_env_file(
         lines = []
 
     remaining = dict(values)
+    seen_managed: set[str] = set()
     merged: list[str] = []
     for line in lines:
         stripped = line.strip()
@@ -194,6 +195,9 @@ def update_env_file(
             name = stripped.split("=", 1)[0].strip()
             if name in remaining:
                 merged.append(f"{name}={remaining.pop(name)}")
+                seen_managed.add(name)
+                continue
+            if name in seen_managed:
                 continue
         merged.append(line)
     merged.extend(f"{name}={value}" for name, value in remaining.items())
@@ -202,9 +206,14 @@ def update_env_file(
         env_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = env_path.with_name(f".{env_path.name}.{os.getpid()}.tmp")
         try:
-            tmp_path.write_text("\n".join(merged) + "\n", encoding="utf-8")
-            with contextlib.suppress(OSError):
-                os.chmod(tmp_path, 0o600)
+            fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write("\n".join(merged) + "\n")
+            except Exception:
+                with contextlib.suppress(OSError):
+                    os.close(fd)
+                raise
             tmp_path.replace(env_path)
             with contextlib.suppress(OSError):
                 os.chmod(env_path, 0o600)

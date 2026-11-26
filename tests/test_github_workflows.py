@@ -66,7 +66,7 @@ def test_all_workflows_declare_permissions_and_follow_fork_safety_invariants() -
     )
     for wf in workflows:
         text = wf.read_text(encoding="utf-8")
-        assert re.search(r"(?m)^permissions:\s*$", text), f"{wf.name} must declare permissions:"
+        assert re.search(r"(?m)^permissions:(?:\s*\{\}|\s*$)", text), f"{wf.name} must declare permissions:"
         if wf.name in {"pr-policy-comment.yml", "issue-triage.yml"}:
             assert "actions/checkout" not in text, f"{wf.name} must never checkout code"
             # Untrusted fields may appear only inside `env:` mappings, never inline inside `run:`.

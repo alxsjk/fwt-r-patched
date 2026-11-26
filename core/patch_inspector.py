@@ -762,12 +762,15 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
     except Exception as exc:
         _feature(reports, "hero_shop_offers", "Evan and Alex Shop Offers", False, "Unknown", str(exc))
 
-    active = inspect_surprise_transcendence_package(so_bytes, seg_offset)
-    _feature(
-        reports, "surprise_transcendence_package", "Surprise Transcendence Package 2", active,
-        "Active (500 diamonds, 10 of each ticket)" if active else "Original / Partial",
-        "Offer 75103 and both isolated ticket components",
-    )
+    try:
+        active = inspect_surprise_transcendence_package(so_bytes, seg_offset)
+        _feature(
+            reports, "surprise_transcendence_package", "Surprise Transcendence Package 2", active,
+            "Active (500 diamonds, 10 of each ticket)" if active else "Original / Partial",
+            "Offer 75103 and both isolated ticket components",
+        )
+    except Exception as exc:
+        _feature(reports, "surprise_transcendence_package", "Surprise Transcendence Package 2", False, "Unknown", str(exc))
 
     try:
         from core.alex_awakening import inspect_alex_awakening_native
@@ -2890,14 +2893,17 @@ def inspect_dex(
         # present AND both fragments are gone; otherwise report Unknown.
         shim_ok = False
         if so_bytes is not None:
-            if bytes(so_bytes[:4]) == b"\x7fELF":
-                from core.core_patches import ELF_SEGMENTS
-                from core.elf_mapping import canonicalize_segments
+            try:
+                if bytes(so_bytes[:4]) == b"\x7fELF":
+                    from core.elf_mapping import read_load_segments, translate_vaddr
 
-                so_bytes, _ = canonicalize_segments(so_bytes, ELF_SEGMENTS)
-            shim_off = seg_offset(SHIM_VADDR)
-            if len(so_bytes) >= shim_off + 12:
-                shim_ok = struct.unpack_from("<I", so_bytes, shim_off + 8)[0] == SHIM_MAGIC
+                    shim_off = translate_vaddr(read_load_segments(so_bytes), SHIM_VADDR + 8, 4)
+                else:
+                    shim_off = seg_offset(SHIM_VADDR) + 8
+                if len(so_bytes) >= shim_off + 4:
+                    shim_ok = struct.unpack_from("<I", so_bytes, shim_off)[0] == SHIM_MAGIC
+            except Exception:
+                shim_ok = False
         dex_view = bytes(dex_bytes)
         originals_present = any(
             sig in dex_view for sig in _DEX_BACKUP_ORIGINAL_SIGNATURES
@@ -2930,9 +2936,9 @@ def inspect_dex(
 
 
 def _elf_min_load_align(data: bytes) -> int:
-    """Returns the minimum p_align of PT_LOAD segments in an ELF64 file."""
-    if len(data) < 64 or data[:4] != b"\x7fELF" or data[4] != 2:
-        raise ValueError("not an ELF64 file")
+    """Returns the minimum p_align of PT_LOAD segments in an ELF64 LE file."""
+    if len(data) < 64 or data[:4] != b"\x7fELF" or data[4] != 2 or data[5] != 1:
+        raise ValueError("not a little-endian ELF64 file")
     e_phoff = struct.unpack_from("<Q", data, 32)[0]
     e_phentsize = struct.unpack_from("<H", data, 54)[0]
     e_phnum = struct.unpack_from("<H", data, 56)[0]
@@ -2978,13 +2984,14 @@ def check_apk_alignment(apk_path: Path) -> tuple[bool, str]:
                 header = stream.read(64)
                 if len(header) < 64:
                     return False, f"Truncated ELF header for {info.filename}"
-                if header[:4] != b"\x7fELF" or header[4] != 2:
-                    return False, f"{Path(info.filename).name} is not an ELF64 file"
+                if header[:4] != b"\x7fELF" or header[4] != 2 or header[5] != 1:
+                    return False, f"{Path(info.filename).name} is not a little-endian ELF64 file"
                 e_phoff = struct.unpack_from("<Q", header, 32)[0]
                 e_phentsize = struct.unpack_from("<H", header, 54)[0]
                 e_phnum = struct.unpack_from("<H", header, 56)[0]
                 ph_size = e_phoff + e_phnum * e_phentsize
-                if ph_size < 64:
+                max_ph_size = min(info.file_size, 1024 * 1024)
+                if ph_size < 64 or ph_size > max_ph_size:
                     return False, f"Invalid ELF program header size for {info.filename}"
                 remaining = ph_size - len(header)
                 body = header + (stream.read(remaining) if remaining > 0 else b"")
@@ -3203,6 +3210,16 @@ def _inspect_apk_resources(
         missing_archive_detail=missing_detail or "Alex Awakening resource archive missing",
         missing_status=missing_status,
     )
+    _reconcile_so_and_resource_report(
+        features,
+        key="alex_heros_mark",
+        name="Alex's Hero's Mark — The Unbroken Lance",
+        active_status="Active (mark row, overlap boost, set effects, icon, cooltime)",
+        inner_zip=inner_zip,
+        inspector=inspect_alex_heros_mark_assets,
+        missing_archive_detail=missing_detail or "Alex's Hero's Mark resource archive missing",
+        missing_status=missing_status,
+    )
 
     shop_names = {
         "event_discount": "90% Event Shop Discount",
@@ -3406,12 +3423,6 @@ def _inspect_apk_resources(
             "Alex Skill, Passive & Awake Rebalance",
             "Active (Skills 1-3, Passive & Awake Thornbush)",
             inspect_alex_rebalance_assets,
-        ),
-        (
-            "alex_heros_mark",
-            "Alex's Hero's Mark — The Unbroken Lance",
-            "Active (mark row, overlap boost, set effects, icon, cooltime)",
-            inspect_alex_heros_mark_assets,
         ),
     )
     if inner_zip is not None:
@@ -3814,6 +3825,14 @@ def verify_report(report: InspectionReport, options: PatchOptions) -> list[str]:
     return problems
 
 
+BASELINE_BUGFIX_KEYS = frozenset({
+    "no_win_box",
+    "hero_exp_cap",
+    "convert_hex_guard",
+    "dungeon_recom_info",
+})
+
+
 def verify_release_report(report: InspectionReport) -> list[str]:
     """Reject unverified, incomplete or development artifacts for release."""
     problems = verify_report(report, report.build_options or PatchOptions())
@@ -3825,7 +3844,7 @@ def verify_release_report(report: InspectionReport) -> list[str]:
         problems.append(f"Release requires 16 KB alignment: {report.alignment_details}")
     if report.is_valid_apk and not any(
         feature.active for key, feature in report.features.items()
-        if key not in {"no_win_box", "hero_exp_cap", "convert_hex_guard", "dev_build_marker"}
+        if key not in (BASELINE_BUGFIX_KEYS | {"dev_build_marker"})
     ):
         problems.append("APK appears unpatched (no active gameplay patches detected)")
     return problems

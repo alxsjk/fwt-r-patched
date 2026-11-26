@@ -44,7 +44,13 @@ from core.apk_tooling import (
     locate_tools,
     repack_and_sign_apk,
 )
-from core.core_patches import DEV_OUTPUT_SUFFIX, DevOptions, PatchOptions, is_dev_output_path
+from core.core_patches import (
+    DEV_OUTPUT_SUFFIX,
+    DevOptions,
+    PatchOptions,
+    is_dev_output_path,
+    validate_patch_options,
+)
 from core.patch_inspector import (
     detect_cave_overlap,
     inspect_apk,
@@ -242,19 +248,14 @@ def run_cli(args: argparse.Namespace) -> int:
         return 1
 
     # 5. Patch & Build mode
-    input_default = os.environ.get(
-        "FWT_SOURCE_APK", "source/fwt_0.682_offline_v1574.apk"
-    )
-    output_default = os.environ.get("FWT_OUTPUT_APK") or "output/FWT-Reborn-Patched.apk"
-    input_apk = (
-        Path(args.input).expanduser()
-        if args.input
-        else (PROJECT_ROOT / input_default).expanduser()
-    )
+    def _resolve_cfg_path(raw: str | None, env_key: str, default_rel: str) -> Path:
+        val = (raw or os.environ.get(env_key) or default_rel).strip()
+        p = Path(val).expanduser()
+        return p if p.is_absolute() else (PROJECT_ROOT / p)
+
+    input_apk = _resolve_cfg_path(args.input, "FWT_SOURCE_APK", "source/fwt_0.682_offline_v1574.apk")
     output_apk = versioned_output_path(
-        Path(args.output).expanduser()
-        if args.output
-        else (PROJECT_ROOT / output_default).expanduser(),
+        _resolve_cfg_path(args.output, "FWT_OUTPUT_APK", "output/FWT-Reborn-Patched.apk"),
         dev=args.dev,
     )
     if output_apk.suffix.lower() != ".apk":
@@ -287,14 +288,6 @@ def run_cli(args: argparse.Namespace) -> int:
     lan_redirect = args.lan is not None
     lan_ip, lan_port = args.lan if args.lan else ("127.0.0.1", 8010)
 
-    if args.summon_rates and args.summon_50_30_20:
-        print(
-            "Error: --summon-rates (70/20/10) and --summon-50-30-20 (50/30/20) "
-            "are mutually exclusive.",
-            file=sys.stderr,
-        )
-        return 2
-
     # Classic summon profile handling.
     if args.summon_rates:
         summon_70_20_10 = True
@@ -308,14 +301,6 @@ def run_cli(args: argparse.Namespace) -> int:
 
     # --all uses the server-side half debit.
     stamina_half = bool(args.stamina_cost_half or args.all)
-
-    if args.limit_break_cost_tenth and args.limit_break_cost_fixed:
-        print(
-            "Error: --limit-break-cost-tenth and --limit-break-cost-fixed "
-            "are mutually exclusive.",
-            file=sys.stderr,
-        )
-        return 2
 
     # The 90% limit-break discount and the flat price are mutually exclusive;
     # --all ships the flat price unless --limit-break-cost-tenth is requested.
@@ -429,6 +414,12 @@ def run_cli(args: argparse.Namespace) -> int:
         dev=dev_options,
     )
 
+    try:
+        validate_patch_options(opts)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
     if not _has_selected_feature(opts):
         print(
             "Error: no patch features selected. Pass --all, at least one "
@@ -437,12 +428,7 @@ def run_cli(args: argparse.Namespace) -> int:
         )
         return 2
 
-    keystore_default = os.environ.get("FWT_KEYSTORE", "keystore/fwt_reborn_lan.jks")
-    keystore_path = (
-        Path(args.keystore).expanduser()
-        if args.keystore
-        else (PROJECT_ROOT / keystore_default).expanduser()
-    )
+    keystore_path = _resolve_cfg_path(args.keystore, "FWT_KEYSTORE", "keystore/fwt_reborn_lan.jks")
 
     print(f"Building patched APK: {input_apk.name} -> {output_apk.name}")
     non_feature = {"lan_redirect", "server_ip", "server_port", "align_16k", "allow_unknown", "dev"}
@@ -571,8 +557,8 @@ def build_parser() -> argparse.ArgumentParser:
     modes.add_argument("--inspect", type=str, help="Inspect specified APK and display patch report")
     modes.add_argument("--inspect-so", type=str, help="Inspect a standalone libfwt_local_server.so")
     modes.add_argument("--backup", action="store_true", help="Backup savegame from connected ADB device")
-    modes.add_argument("--restore", type=str, metavar="JSON", help="Restore a savegame JSON (requires root)")
-    modes.add_argument("--uninstall", action="store_true", help="Uninstall com.nexon.fwar (wipes app data; combine with --install to reinstall)")
+    parser.add_argument("--restore", type=str, metavar="JSON", help="Restore a savegame JSON (requires root; combine with --install to restore after build)")
+    parser.add_argument("--uninstall", action="store_true", help="Uninstall com.nexon.fwar (wipes app data; combine with --install to reinstall)")
     parser.add_argument("--device", type=str, help="Target ADB device ID (e.g. 192.0.2.10:5555)")
     parser.add_argument("--input", "-i", type=str, help="Base input APK path")
     parser.add_argument("--output", "-o", type=str, help="Destination patched APK path")
@@ -700,7 +686,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mana-cylinder-x10", action="store_true", help="Mana Stone Compactor yields 10x mana per charge")
     parser.add_argument("--event-coin-x10", action="store_true", help="Enable 10x Event Coin Drop on Campaign Stages")
     parser.add_argument("--campaign-shop-discount", action="store_true", help="Enable 90%% discount across campaign shops (Honor, Ancient Coins, Guild Raid, Unknown Paradise, and Friend Shop)")
-    parser.add_argument("--mode-drops-x10", action="store_true", help="Enable 10x drops across 6 game modes (Unknown Paradise, Battle of Honor, Dimension Breakthrough, Pit of Nephthys, Sky Library, Lost Island); Battle of Honor rank points are x2 on victory")
+    parser.add_argument("--mode-drops-x10", action="store_true", help="Enable 10x drops across 6 game modes (Unknown Paradise, Battle of Honor, Dimension Breakthrough, Pit of Nephthys, Sky Library, Lost Island); Battle of Honor rank points are fixed at 100 on victory")
     parser.add_argument("--devil-boost-x10", action="store_true", help="Multiply the Devil's Soul EXP-synthesis boost by 10 (2x -> 20x)")
     parser.add_argument("--battle-arena-fix", action="store_true", help="Fix Battle Arena/PvP team saving (compacts 8 members to 4 leaders) and empty slot handling")
     parser.add_argument("--guild-raid-mercenary", action="store_true", help="Allow selecting own mercenary with equipment and stats in Guild Raid")
@@ -744,7 +730,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--merlin-auto-support",
         action="store_true",
-        help="When Merlin is in Slot 1 in Auto Mode, cast Magic infusion on reachable allies whose Awakening skill cooldown is 1 (slot order tie-break)",
+        help="When Merlin is in Slot 1 in Auto Mode, cast Magic infusion on reachable allies whose Awakening skill cooldown is 1 (prioritizes skills over bonus cells, strongest-Awakening tie-break)",
     )
     parser.add_argument("--coocoo-exp-x2", action="store_true", help="Always apply the x2 EXP bonus when leveling heroes with coocoos")
     parser.add_argument("--coocoo-level-x2", action="store_true", help="Double the coocoo levels dropped by the 30 Coocoo Garden / Pit of Nephthys stages (final stage 220 -> 440)")

@@ -13,30 +13,32 @@ Only the 90% profile remains; the half variants were removed.
 
 from __future__ import annotations
 
-import argparse
-
 from core.apk_tooling import limit_break_client_divisor
+from fwt_patcher import build_parser
 
 
-def _resolve(argv: list[str]) -> bool:
-    """The same priority chain the CLI uses for the remaining discount."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--all", action="store_true")
-    parser.add_argument("--limit-break-cost-tenth", action="store_true")
-    args = parser.parse_args(argv)
-    return bool(args.limit_break_cost_tenth or args.all)
+def _resolve(argv: list[str]) -> tuple[bool, bool]:
+    """Use the production CLI parser to resolve limit-break cost flags."""
+    args = build_parser().parse_args(argv)
+    tenth = bool(args.limit_break_cost_tenth)
+    fixed = bool(args.limit_break_cost_fixed or (args.all and not tenth))
+    return tenth, fixed
 
 
-def test_umbrella_enables_the_tenth_discount() -> None:
-    assert _resolve(["--all"]) is True
+def test_umbrella_enables_the_fixed_profile() -> None:
+    assert _resolve(["--all"]) == (False, True)
+
+
+def test_explicit_tenth_overrides_umbrella() -> None:
+    assert _resolve(["--all", "--limit-break-cost-tenth"]) == (True, False)
 
 
 def test_explicit_tenth_enables_the_discount() -> None:
-    assert _resolve(["--limit-break-cost-tenth"]) is True
+    assert _resolve(["--limit-break-cost-tenth"]) == (True, False)
 
 
 def test_no_discount_by_default() -> None:
-    assert _resolve([]) is False
+    assert _resolve([]) == (False, False)
 
 
 def test_tenth_and_none_for_the_client_table() -> None:

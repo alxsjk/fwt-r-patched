@@ -242,13 +242,16 @@ class AxmlDocument:
             out += _encode_length8(len(encoded))
             out += encoded + b"\x00"
             return bytes(out)
-        return _encode_length16(len(text)) + text.encode("utf-16-le") + b"\x00\x00"
+        utf16_bytes = text.encode("utf-16-le")
+        return _encode_length16(len(utf16_bytes) // 2) + utf16_bytes + b"\x00\x00"
 
     def append_string(self, text: str) -> tuple[bytes, int]:
         """Returns the document with ``text`` appended to the pool and its index."""
         new_string = self.pool_string_bytes(text)
         count = len(self._pool_offsets)
         header_size = struct.unpack_from("<H", self.data, self._pool_offset + 2)[0]
+        if header_size != _POOL_HEADER_SIZE:
+            raise ValueError(f"Unsupported string pool header size: {header_size}")
         data_start = self._pool_data_offset
         data_end = self._pool_offset + self._pool_size
         data = bytearray(self.data[data_start:data_end])
@@ -261,10 +264,12 @@ class AxmlDocument:
             data += b"\x00"
         strings_start = header_size + 4 * (count + 1)
         pool_size = strings_start + len(data)
+        # Clear SORTED_FLAG (0x0001) because appending at the end may break sort order.
+        flags = self._pool_flags & ~0x0001
         pool = bytearray()
         pool += struct.pack("<HHI", RES_STRING_POOL_TYPE, header_size, pool_size)
         pool += struct.pack(
-            "<IIIII", count + 1, 0, self._pool_flags, strings_start, 0
+            "<IIIII", count + 1, 0, flags, strings_start, 0
         )
         pool += b"".join(struct.pack("<I", value) for value in offsets)
         pool += data

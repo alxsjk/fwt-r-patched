@@ -59,7 +59,11 @@ def sha256_of(path: Path) -> str:
 def load_registry() -> list[dict[str, Any]]:
     if REGISTRY.exists():
         with REGISTRY.open(encoding="utf-8") as handle:
-            entries: list[dict[str, Any]] = json.load(handle)
+            data = json.load(handle)
+            if isinstance(data, dict):
+                releases: list[dict[str, Any]] = data.get("releases", [])
+                return releases
+            entries: list[dict[str, Any]] = data
             return entries
     return []
 
@@ -132,7 +136,8 @@ def main() -> None:
         "notes": args.notes,
     }
     entries.append(entry)
-    REGISTRY.write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    REGISTRY.write_text(json.dumps({"releases": entries}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     TABLE.write_text(render(entries), encoding="utf-8")
     print(f"registered: {entry['version']} ({entry['kind']}) sha256={digest[:16]}")
 

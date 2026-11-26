@@ -32,6 +32,13 @@ SO_MEMBER = "lib/arm64-v8a/libfwt_local_server.so"
 
 
 def main() -> int:
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(ROOT / ".env", override=False)
+    except ImportError:
+        pass
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("apk")
     parser.add_argument("--zipalign", default=None)
@@ -48,14 +55,15 @@ def main() -> int:
     print(f"apk bytes        {apk.stat().st_size}")
     print(f"{SO_MEMBER}  {len(so)} bytes, compress_type={info.compress_type}")
 
-    offset = lambda va: translate_vaddr(read_load_segments(so), va)  # noqa: E731
+    segments = read_load_segments(so)
+    offset = lambda va: translate_vaddr(segments, va)  # noqa: E731
 
     # 16 KB paging requirement, as the project enforces it: the ELF's PT_LOAD
     # segments must declare p_align >= 16384 and the .so must be stored. The zip
     # data offset is NOT 16 KB aligned in the shipped artifact either: apksigner
     # re-packs the archive after `zipalign -f 16384`, leaving 4-byte alignment.
     with open(apk, "rb") as handle:
-        handle.seek(info.header_offset + 28)
+        handle.seek(info.header_offset + 26)
         name_len = int.from_bytes(handle.read(2), "little")
         extra_len = int.from_bytes(handle.read(2), "little")
     data_offset = info.header_offset + 30 + name_len + extra_len
@@ -123,12 +131,17 @@ def main() -> int:
         if not ok:
             problems.append("APK fails `zipalign -c -p 4`")
 
+    from core.patch_inspector import inspect_apk, verify_release_report
+
+    release_problems = verify_release_report(inspect_apk(apk))
+    problems.extend(release_problems)
+
     print()
     if problems:
         for problem in problems:
             print("FAIL:", problem)
         return 1
-    print("VERIFIED: packaged .so carries 14.01 + 14.02 + 14.03 and the APK is 16 KB aligned")
+    print("VERIFIED: release APK passed full inspection, 14.01 Merlin check, and 16 KB alignment")
     return 0
 
 
