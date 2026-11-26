@@ -103,6 +103,11 @@ def test_pr_policy_evaluates_maintainer_and_linked_issue_states() -> None:
         assert ok is True
         assert "Maintainer" in msg
 
+        # Trusted Dependabot PR passes policy without an approved issue.
+        ok, msg = evaluate("dependabot[bot]", "", "alxsjk/fwt-r-patched", lambda _n: (404, None))
+        assert ok is True
+        assert "Dependabot" in msg
+
         # Template HTML comments are ignored.
         assert extract("<!-- Closes #123 -->\nSummary", "alxsjk/fwt-r-patched") == []
         ok, _ = evaluate("contributor", "<!-- Closes #123 -->", "alxsjk/fwt-r-patched", lambda _n: (404, None))

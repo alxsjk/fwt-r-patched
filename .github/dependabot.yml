@@ -8,3 +8,10 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    ignore:
+      # DuckDB 2.x requires x86-64-v3 (AVX2); keep 1.5.x (<2) per constitution.
+      - dependency-name: "duckdb"
+        update-types: ["version-update:semver-major"]
+      # frida-tools==14.13.1 constrains websockets<14; keep 13.x per constitution.
+      - dependency-name: "websockets"
+        update-types: ["version-update:semver-major"]

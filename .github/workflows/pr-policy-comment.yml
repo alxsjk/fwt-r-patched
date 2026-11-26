@@ -11,7 +11,7 @@ permissions:
 jobs:
   comment:
     name: PR Policy Feedback
-    if: github.event.pull_request.user.login != 'alxsjk'
+    if: github.event.pull_request.user.login != 'alxsjk' && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-24.04
     steps:
       - name: Post or update PR policy feedback comment
@@ -68,8 +68,11 @@ jobs:
               maintainer: str = "alxsjk",
               required_label: str = "approved",
           ) -> tuple[bool, str]:
-              if author.strip().lower() == maintainer.strip().lower():
+              author_norm = author.strip().lower()
+              if author_norm == maintainer.strip().lower():
                   return True, f"Maintainer PR (@{maintainer}) - policy check passed."
+              if author_norm == "dependabot[bot]":
+                  return True, "Trusted Dependabot PR - policy check passed (still requires CI + maintainer review)."
 
               numbers = extract_issue_numbers(body, repo)
               if not numbers:
