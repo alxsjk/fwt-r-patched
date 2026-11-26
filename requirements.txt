@@ -25,7 +25,7 @@ polars[rtcompat]==2.1.0
 pandas==3.1.1
 # DuckDB 2.x requires x86-64-v3 (AVX2). This project also supports legacy
 # x86-64 CPUs, so the runtime file pins the AVX2-free 1.5.x line.
-duckdb==1.5.6
+duckdb==2.0.1
 orjson==3.13.0
 ijson==3.6.0
 jmespath==1.1.0
