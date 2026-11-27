@@ -1,6 +1,6 @@
 # Grouped Feature Catalog
 
-This is the canonical index of GUI feature numbers for FWT Reborn Patch 2.5.60. The same IDs appear in the graphical interface. For code locations, byte sequences and validation history, see [PATCH_SPEC.md](PATCH_SPEC.md).
+This is the canonical index of GUI feature numbers for FWT Reborn Patch 2.5.61. The same IDs appear in the graphical interface. For code locations, byte sequences and validation history, see [PATCH_SPEC.md](PATCH_SPEC.md).
 
 IDs are stable references, not positions: never renumber or reuse an ID. If a feature moves to another group, keep its existing ID; its prefix identifies the group in which it was first assigned. Add new items with a new number in the relevant group and update `gui/feature_catalog.py` and this catalog together. The parity tests verify the mapping.
 
@@ -110,7 +110,7 @@ bonuses are still under investigation and are not yet guaranteed.
 
 | ID | Feature | CLI | PatchOptions field | GUI variable | `--all` |
 |---|---|---|---|---|---|
-| 08.01 | English localization | `--english` | `english_localization` | `var_english` | Yes |
+| 08.01 | English localization (UI, Summon, Shop, mini-shops, server strings & client tables) | `--english` | `english_localization` | `var_english` | Yes |
 | 08.02 | 16 KB alignment | `--no-16k` disables | `align_16k` | `var_align_16k` | Default on |
 | 08.03 | Hide phantom Coocoo boxes and disable bonus boxes in hero-gene Subjugation | Always on | Built-in fix | None | Always |
 | 08.04 | LAN server redirect | `--lan` | `lan_redirect` | `net_mode_var` | No |

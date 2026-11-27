@@ -21,6 +21,7 @@ _STOCK_HASHES = {
 _STOCK_NAME = "균형의 옥"
 _STONE_NAMES = ["Mythical Stone", "Mythical Stone", "Mythic Stone", "Mythic Stone", "Mythic Stone"]
 _JADE_NAMES = [_STOCK_NAME] * 4 + ["균형의옥"]
+_JADE_NAMES_EN = ["Balance Jade"] * 5
 
 
 def _hash_row(row: dict[str, Any]) -> str:
@@ -72,7 +73,7 @@ def _classify(row: dict[str, Any], code: str) -> str:
             row.get("price_count") in (3500, 350)
             and row.get("limit_type") == 1
             and row.get("limit_max") == 20
-            and row.get("shop_name") == _JADE_NAMES
+            and row.get("shop_name") in (_JADE_NAMES, _JADE_NAMES_EN)
         )
     state = "stock" if stock else "patched" if patched else "unknown"
     if state == "unknown" or _hash_row(_normalize(row, code, state == "patched")) != _STOCK_HASHES[code]:

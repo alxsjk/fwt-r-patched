@@ -50,10 +50,28 @@ _ROWS = (
 )
 
 
+_SURPRISE_SHOP_NAME_EN = (
+    b'"shop_name":["Surprise Sale Infinite Gear Transcend Pack 2",'
+    b'"Surprise Sale Infinite Gear Transcend Pack 2",'
+    b'"Surprise Sale Infinite Gear Transcend Pack 2",'
+    b'"Surprise Sale Infinite Gear Transcend Pack 2",'
+    b'"Surprise Sale Infinite Gear Transcend Pack 2"          ]'
+)
+_SURPRISE_SHOP_NAME_KR = (
+    '"shop_name":["깜짝 할인 무한 장비 초월 패키지 2",'
+    '"깜짝 할인 무한 장비 초월 패키지 2",'
+    '"깜짝 할인 무한 장비 초월 패키지 2",'
+    '"깜짝 할인 무한 장비 초월 패키지 2",'
+    '"깜짝 할인 무한 장비 초월 패키지 2"]'
+).encode()
+
+
 def _record_digest(raw: bytes | bytearray, address: int) -> str:
-    # The daily event limit patch can change the offer's limit_type from 4 to 1.
+    # The daily event limit patch can change the offer's limit_type from 4 to 1,
+    # and English localization translates the offer's shop_name in place.
     if address in _OFFER_ADDRESSES:
         raw = raw.replace(b'"limit_type":1,', b'"limit_type":4,', 1)
+        raw = raw.replace(_SURPRISE_SHOP_NAME_EN, _SURPRISE_SHOP_NAME_KR, 1)
     return hashlib.sha256(raw).hexdigest()
 
 

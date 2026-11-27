@@ -1291,7 +1291,7 @@ def test_reference_all_patch_counts_and_egl_integrity(reference_buffers):
         "guild_raid_mercenary": 4,
         "guild_raid_reward_x10": 32,
         "lan_redirect": 1,
-        "english_localization": 55,
+        "english_localization": 4992,
     }
     # The EGL function must remain byte-for-byte original.
     assert result.so_bytes[0xAA6BFC - 0x4000:0xAA6D2C - 0x4000] == so_bytes[

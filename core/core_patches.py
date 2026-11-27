@@ -49,6 +49,7 @@ from core.dungeon_recom_info import (
 )
 from core.dungeon_recom_info import apply_dungeon_recom_info
 from core.elf_mapping import canonicalize_segments, project_segments
+from core.english_localization import apply_english_server_catalog
 from core.equipment_tier_upgrades import CAVES as EQUIPMENT_TIER_CAVES
 from core.equipment_tier_upgrades import apply_equipment_tiers
 from core.guild_raid_fire_support import (
@@ -2042,8 +2043,9 @@ EXPECTED_PATCH_COUNTS = {
     "stamina_cost_half": 1,
     "stamina_potion_1000": 1,
     # 51 translated bootstrap literals + the saveCopy English branch, plus the
-    # two SO localization gates and the "Qty" rodata replacement.
-    "english_localization": len(ENGLISH_SO_GATES) + 1 + 51 + 1,
+    # two SO localization gates, the "Qty" rodata replacement, and 4937
+    # server catalog/UI strings in .rodata/.text.
+    "english_localization": len(ENGLISH_SO_GATES) + 1 + 4937 + 51 + 1,
     # One row per option-table entry: the bias rewrites the whole table so only
     # each attribute/grade pool's top-quality rows stay weighted.
     "option_max_attributes": 1856,
@@ -4416,6 +4418,7 @@ def apply_english_localization_so(buf: bytearray) -> int:
             "English Qty rodata",
         )
         changed += 1
+    changed += apply_english_server_catalog(buf, seg_offset)
     return changed
 
 
@@ -7862,7 +7865,18 @@ def apply_all_patches(
         if options.english_localization:
             english_count = apply_english_localization_so(so_buf)
             english_count += translation_count
-            record("english_localization", english_count)
+            # Shop patches (02.07/02.09/02.10) already translate a subset of
+            # their own rows before English localization runs; the inspector
+            # verifies the combined catalog result structurally.
+            record(
+                "english_localization",
+                english_count,
+                check_expected=not (
+                    options.hero_shop_offers
+                    or options.mythical_stone_shop
+                    or options.surprise_transcendence_package
+                ),
+            )
         if resource_contract is not None and log_fn is not None:
             log_fn(
                 "Bundled resource contract updated: "

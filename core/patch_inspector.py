@@ -64,6 +64,8 @@ from core.core_patches import (
     ENERGY_FLASK_STAMINA_REPLACEMENT,
     ENERGY_FLASK_STAMINA_SITE,
     ENGLISH_SO_GATES,
+    ENGLISH_SO_QTY_OFFSET,
+    ENGLISH_SO_QTY_REPLACEMENT,
     EQUIPMENT_LOCK_FIX_NOP,
     EQUIPMENT_LOCK_FIX_ORIGINAL,
     EQUIPMENT_LOCK_FIX_SITE,
@@ -299,6 +301,10 @@ from core.dungeon_recom_info import (
     HOOK_VADDR as DUNGEON_RECOM_INFO_HOOK_SITE,
 )
 from core.dungeon_recom_info import inspect_dungeon_recom_info
+from core.english_localization import (
+    inspect_english_localization_assets,
+    inspect_english_server_catalog,
+)
 from core.equipment_tier_upgrades import inspect_equipment_tiers
 from core.guild_raid_fire_support import inspect_guild_raid_fire_support
 from core.guild_raid_protection_persist import inspect_guild_raid_protection_persist
@@ -646,21 +652,35 @@ def inspect_native_so(so_bytes: bytes | bytearray) -> dict[str, FeatureReport]:
             reports, "campaign_gold", "10x Campaign Gold & Drops", False, "Unknown", str(exc)
         )
 
-    # 6. English Localization Gates Check (both SO gates)
+    # 6. English Localization Gates + Server Catalog & UI Check
     try:
         matching = 0
         for src, dst in ENGLISH_SO_GATES:
             offset = seg_offset(src)
             if bytes(so_bytes[offset:offset + 4]) == encode_arm64_branch(src, dst):
                 matching += 1
-        active = matching == len(ENGLISH_SO_GATES)
+        qty_ok = (
+            bytes(
+                so_bytes[
+                    ENGLISH_SO_QTY_OFFSET : ENGLISH_SO_QTY_OFFSET
+                    + len(ENGLISH_SO_QTY_REPLACEMENT)
+                ]
+            )
+            == ENGLISH_SO_QTY_REPLACEMENT
+        )
+        cat_ok, cat_msg = inspect_english_server_catalog(so_bytes, seg_offset)
+        active = matching == len(ENGLISH_SO_GATES) and qty_ok and cat_ok
+        details = (
+            f"{matching}/{len(ENGLISH_SO_GATES)} gates, Qty={'OK' if qty_ok else 'Korean'}; "
+            + cat_msg
+        )
         _feature(
             reports,
             "english_localization",
             "English Localization",
             active,
-            "Active (Unlocked)" if active else "Original / Partial",
-            f"{matching}/{len(ENGLISH_SO_GATES)} Korean localization gates bypassed",
+            "Active (Full Server & UI)" if active else "Original / Partial",
+            details,
         )
     except Exception as exc:
         _feature(
@@ -3397,6 +3417,19 @@ def _inspect_apk_resources(
         inner_zip=inner_zip,
         inspector=inspect_equipment_upgrade_10_assets,
         missing_archive_detail=missing_detail or "assets/fwt_resources_v1.zip is missing; client upgrade table unchecked",
+        missing_status=missing_status,
+    )
+    _reconcile_so_and_resource_report(
+        features,
+        key="english_localization",
+        name="English Localization",
+        active_status="Active (Full Server, UI & Client Tables)",
+        inner_zip=inner_zip,
+        inspector=inspect_english_localization_assets,
+        missing_archive_detail=(
+            missing_detail
+            or "assets/fwt_resources_v1.zip is missing; stringtableenglish/shipyarddataenglish unchecked"
+        ),
         missing_status=missing_status,
     )
     _reconcile_so_and_resource_report(

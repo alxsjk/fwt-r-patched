@@ -7,6 +7,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.5.61] - 2026-11-26
+
+### Added
+- **Complete English localization for Summon, Shop, mini-shops, server UI, and leftover client tables (`08.01`, `--english`, included in `--all`)**:
+  - Added `core/english_localization.py` and `core/english_localization_data.py` translating all **1,735** unique Korean strings across **4,097+** embedded JSON catalog arrays in `libfwt_local_server.so` (Shop hub categories, banners, mini-shop items/packages/descriptions, Summon banners/bubbles/guarantees, and event headers), plus **44** SHA-256-verified NUL-split boundary fragments and 9-language event headers.
+  - Translated all **796** user-facing small NUL-terminated C++ strings in `.rodata` (including Summon `Change Rotation`, rotation dialog/timer, Tower of Dawn rules, stage/achievement missions, and event mails) within exact original UTF-8 byte budgets, including exact-length matches for the 4 fixed-`memcpy` literals and a two-instruction ARM64 SSO update at `0xA4B17C`/`0xA4B184` (`"5+ attempts"`).
+  - Translated the **10** leftover Korean rows in `stringtableenglish.unity3d` and **4** repair labels in `shipyarddataenglish.unity3d` inside `assets/fwt_resources_v1.zip`, updating `ResourceContract` automatically.
+  - Updated `core/hero_shop_offers.py`, `core/mythical_shop.py`, `core/surprise_transcendence_package.py`, and `core/patch_inspector.py` so `--english` and all shop patches (`02.07`, `02.09`, `02.10`) compose and verify cleanly together.
+
 ## [2.5.60] - 2026-11-25
 
 ### Fixed

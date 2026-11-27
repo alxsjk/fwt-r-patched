@@ -52,7 +52,10 @@ def _normalize(row: dict[str, Any], code: str) -> tuple[str, dict[str, Any]]:
         result.update(price_count=50, limit_type=4)
     else:
         stock = row.get("item_count") == 60 and row.get("shop_name") == ["다이아"] * 5
-        patched = row.get("item_count") == 100 and row.get("shop_name") == ["Diamond"] + ["다이아"] * 4
+        patched = (
+            row.get("item_count") == 100
+            and row.get("shop_name") in (["Diamond"] + ["다이아"] * 4, ["Diamond"] * 5)
+        )
         if row.get("price_count") not in (100, 10) or row.get("limit_type") not in (1, 4):
             raise ValueError("Unexpected diamond source profile")
         if patched:
@@ -69,7 +72,15 @@ def _fragment(raw: bytes) -> str:
     patched = b'"item_count":100' in raw
     if patched:
         raw = raw.replace(b'"item_count":100', b'"item_count":60', 1)
-        raw = raw.replace(b'"shop_name":["Diamond"', '"shop_name":["다이아"'.encode(), 1)
+        en_frag = b'"shop_name":[      "Diamond","Diamond","Diamond","Diamond","'
+        if en_frag in raw:
+            raw = raw.replace(
+                en_frag,
+                '"shop_name":["다이아","다이아","다이아","다이아","'.encode(),
+                1,
+            )
+        else:
+            raw = raw.replace(b'"shop_name":["Diamond"', '"shop_name":["다이아"'.encode(), 1)
         raw = raw.replace(b'"item_count":60, ', b'"item_count":60,', 1)
     raw = re.sub(rb'"price_count":\s*(?:100|10)(?=,)', b'"price_count":100', raw, count=1)
     raw = re.sub(rb'"limit_type":(?:1|4)(?=,)', b'"limit_type":4', raw, count=1)

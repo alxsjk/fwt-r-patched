@@ -20,7 +20,7 @@ and are no longer selectable in the CLI or GUI.
 - Added/changed: `gold_cylinder_x10`, `mana_cylinder_x10`; the client hooks for
   `single_gem_fang` (RVA `0x1DCACEC`) and the campaign/event shop client tables;
   `no_win_box` is now an unconditional bug fix.
-- The release line is still `--all` plus the numeric factors; at `2.5.35`, `--all` covered 50 active features. As of `2.5.60`, `--all` enables **69** selectable features (plus default 16 KB alignment and the 4 always-on `no_win_box`, `hero_exp_cap`, `convert_hex_guard`, and `dungeon_recom_info` fixes; see [FEATURE_CATALOG.md](FEATURE_CATALOG.md)).
+- The release line is still `--all` plus the numeric factors; at `2.5.35`, `--all` covered 50 active features. As of `2.5.61`, `--all` enables **69** selectable features (plus default 16 KB alignment and the 4 always-on `no_win_box`, `hero_exp_cap`, `convert_hex_guard`, and `dungeon_recom_info` fixes; see [FEATURE_CATALOG.md](FEATURE_CATALOG.md)).
 
 ## Original hero modifications (12.01–12.03)
 
@@ -235,7 +235,7 @@ Status legend:
 | 4 | `summon_rates` | Summon 70/20/10 | SO | pools `0xB95FD0`, `0xB96CF0` | Active/validated |
 | 5 | `summon_rates_50_30_20` | Summon 50/30/20 | SO | pools `0xB95FD0`, `0xB96CF0` | Active/validated |
 | 6 | `expedition_bonus` | 10x Expedition | SO | table `0xBBC2D0`; 5 call sites + cave `0xB333EC` | Active/validated |
-| 7 | `english_localization` | English UI & Bootstrap | SO + DEX (smali) | gates `0xAA7CFC/0xAA7DB0`; Qty `0x4D5BA3`; 47 bootstrap strings + `saveCopy` | Active/validated (clean install, 2026-11-08) |
+| 7 | `english_localization` | English UI, Shop, Summon & Bootstrap | SO + DEX + assets | gates `0xAA7CFC/0xAA7DB0`; Qty `0x4D5BA3`; 4,095+ JSON arrays + 44 boundaries + 796 `.rodata` strings + 2 SSO insns (`0xA4B17C`/`0xA4B184`); 47 bootstrap strings + `saveCopy`; `stringtableenglish` (10) & `shipyarddataenglish` (4) | Active/validated |
 | 8 | `event_discount` | 90% Event Shop | SO | JSON `shop_content:2` | Active/validated |
 | 9 | `event_gene_unlimited` | Unlimited Event Genes | SO + assets | JSON `item_category:18` (`limit_type: 255, limit_max: 9`); every localized `shopdata*.unity3d` gene row `_purchaselimittype=255`, `_purchasecountperlimit=255` | Active (server + client tables; 2.5.35) |
 | 10 | — | ~~Mana Stone Compactor 3h~~ | — | Removed in 2.5.35 | — |
@@ -351,12 +351,19 @@ Build & infrastructure fields on `PatchOptions` (not gameplay patches): `server_
 - Trampoline hook at `0xA75904` branches to code cave at `0xB333EC`, multiplying rolled reward quantities by 10x (`mul x19, x19, x8` where x8=10).
 - Reference count: **24**.
 
-#### 7. `english_localization` — English UI & Bootstrap
+#### 7. `english_localization` — English UI, Shop, Summon, Server & Bootstrap
 
-- SO gates:
-  - `0xAA7CFC` → `0xAA7D40` (string table);
-  - `0xAA7DB0` → `0xAA7E24` (message box).
+- SO gates & `.rodata`/`.text` server catalogs (`core/english_localization.py` & `core/english_localization_data.py`):
+  - `0xAA7CFC` → `0xAA7D40` (string table gate);
+  - `0xAA7DB0` → `0xAA7E24` (message box gate).
   - Quantity text at `.rodata 0x4D5BA3`: Korean `'수량\x00'` → ASCII `'Qty\x00\x00\x00\x00'`.
+  - **Embedded server JSON catalogs (`.rodata 0x16F710..0x7994EC`)**: translates **1,735** unique Korean strings across all **4,097+** 1D/2D 5-slot JSON arrays (`shop_name`, `shop_desc`, `title`, `desc`, `button_title`, `battle_name`, `popup_title`, `popup_desc`, `event_title`, `coin_name`), covering the entire Shop hub, all mini-shops, Summon banners/tooltips, and events, with exact byte-length preservation.
+  - **Boundary fragments (`JSON_BOUNDARY_PATCHES`, 44 entries)**: SHA-256-verified in-place replacements for every NUL-split JSON array across `.text` `std::string::append` chunks (including `0x215DE1` / `0x1DB35F` compatibility with `hero_shop_offers`) and 9-language event header arrays at `0x21C3ED` / `0x228C9F`.
+  - **Small `.rodata` C++ strings (`RODATA_STR_PATCHES`, 796 entries)**: NUL-padded in-place replacements (Summon `Change Rotation` at `0x4D5C38`, rotation popup/timer, Tower of Dawn hints, missions, and event mails) within original UTF-8 byte budgets, preserving exact byte lengths for the 4 fixed-`memcpy` sites (`0x3EA282`, `0x3F16F4`, `0x40B370`, `0x547533`) and updating two ARM64 SSO instructions at `0xA4B17C`/`0xA4B184` for `0x466B4D` (`"5+ attempts"`).
+- Client datatables (`assets/fwt_resources_v1.zip`):
+  - `stringtableenglish.unity3d`: translates the **10** leftover Korean rows (`STRINGTABLE_EN_FIXES`).
+  - `shipyarddataenglish.unity3d`: translates the **4** leftover Korean repair labels (`SHIPYARD_EN_FIXES`).
+  - Both update `ResourceContract` automatically.
 - DEX `classes8.dex` (smali rebuild through apktool 3.0.3):
   - Translates all **47 unique hard-coded Korean bootstrap strings** (51
     `const-string` occurrences) across `FwtResourceBootstrapActivity*`:
@@ -370,8 +377,7 @@ Build & infrastructure fields on `PatchOptions` (not gameplay patches): `server_
     values without re-sorting and caused an instant ART abort.
   - `core.dex_smali.verify_dex_string_order()` checks the final table before
     packaging; SHA-1 and Adler32 are recalculated by the assembler.
-- Reference count: **55** modifications (2 SO gates + 1 Qty label + 51
-  translated literals + 1 `saveCopy` branch).
+- Reference count: **4,992** standalone modifications (2 SO gates + 1 Qty label + 4,937 server JSON/boundary/`.rodata`/SSO edits + 51 DEX literals + 1 `saveCopy` branch); when combined with `02.07`/`02.09`/`02.10`, the inspector verifies the combined catalog structurally.
 
 #### 7.1 Bundled resource archive contract
 

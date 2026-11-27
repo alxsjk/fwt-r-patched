@@ -51,6 +51,12 @@ from core.core_patches import (
     recycle_six_star_assignment,
 )
 from core.dex_smali import ResourceContract, ensure_apktool_jar
+from core.english_localization import (
+    SHIPYARD_EN_ASSET_PATH,
+    STRINGTABLE_EN_ASSET_PATH,
+    patch_shipyarddata_english_rows,
+    patch_stringtable_english_rows,
+)
 from core.guild_raid_fire_support import (
     GUILD_SKILL_DATA_CLIENT_ASSET_PATH,
     inspect_guildskilldata_rows,
@@ -2373,6 +2379,64 @@ def _patch_resources_zip_file(
                     if log_fn:
                         log_fn(f"Failed to patch {Path(info.filename).name}: {exc}")
 
+            elif info.filename == STRINGTABLE_EN_ASSET_PATH and options.english_localization:
+                data = archive.read(info.filename)
+                try:
+                    clear, k, v = _decrypt_datatable(data)
+                    env = UnityPy.load(clear)
+                    changed = 0
+                    for obj in env.objects:
+                        if obj.type.name != "MonoBehaviour":
+                            continue
+                        tree = obj.read_typetree()
+                        rows = tree.get("_data") or []
+                        delta = patch_stringtable_english_rows(rows)
+                        if delta:
+                            obj.save_typetree(tree)
+                            changed += delta
+                    if changed:
+                        new_clear = bytes(getattr(env.file, "save")(packer="original"))  # noqa: B009
+                        patched = _encrypt_datatable(new_clear, k, v)
+                        if patched != data:
+                            replacements[info.filename] = patched
+                        if log_fn:
+                            log_fn(
+                                f"Patched stringtableenglish.unity3d: {changed} leftover Korean row(s) translated"
+                            )
+                except Exception as exc:
+                    failures.append(f"stringtableenglish.unity3d: {exc}")
+                    if log_fn:
+                        log_fn(f"Failed to patch stringtableenglish.unity3d: {exc}")
+
+            elif info.filename == SHIPYARD_EN_ASSET_PATH and options.english_localization:
+                data = archive.read(info.filename)
+                try:
+                    clear, k, v = _decrypt_datatable(data)
+                    env = UnityPy.load(clear)
+                    changed = 0
+                    for obj in env.objects:
+                        if obj.type.name != "MonoBehaviour":
+                            continue
+                        tree = obj.read_typetree()
+                        rows = tree.get("_data") or []
+                        delta = patch_shipyarddata_english_rows(rows)
+                        if delta:
+                            obj.save_typetree(tree)
+                            changed += delta
+                    if changed:
+                        new_clear = bytes(getattr(env.file, "save")(packer="original"))  # noqa: B009
+                        patched = _encrypt_datatable(new_clear, k, v)
+                        if patched != data:
+                            replacements[info.filename] = patched
+                        if log_fn:
+                            log_fn(
+                                f"Patched shipyarddataenglish.unity3d: {changed} repair label(s) translated"
+                            )
+                except Exception as exc:
+                    failures.append(f"shipyarddataenglish.unity3d: {exc}")
+                    if log_fn:
+                        log_fn(f"Failed to patch shipyarddataenglish.unity3d: {exc}")
+
             elif (
                 info.filename == MONSTER_DATA_CLIENT_ASSET_PATH
                 and options.guild_raid_boss_no_counter
@@ -2480,6 +2544,8 @@ def _patch_resources_zip_file(
             (options.guild_raid_fire_support or options.guild_raid_skills_max, "guildskilldata.unity3d", r"files/Resources/datatable/guildskilldata\.unity3d$"),
             (options.guild_raid_skills_max, "guildskillinfo", r"files/Resources/datatable/guildskillinfo[a-z]*\.unity3d$"),
             (options.guild_raid_boss_no_counter, "monsterdata.unity3d", r"files/Resources/datatable/monsterdata\.unity3d$"),
+            (options.english_localization, "stringtableenglish.unity3d", r"files/Resources/datatable/stringtableenglish\.unity3d$"),
+            (options.english_localization, "shipyarddataenglish.unity3d", r"files/Resources/datatable/shipyarddataenglish\.unity3d$"),
             (
                 options.event_discount or options.event_gene_unlimited or options.event_limits_daily or options.campaign_shop_discount,
                 "shopcontentsdata",
@@ -2619,7 +2685,8 @@ def _patch_dev_manifest(
 def needs_resource_archive_patch(options: PatchOptions) -> bool:
     """Return True when any enabled patch modifies ``assets/fwt_resources_v1.zip``."""
     return bool(
-        options.mode_drops_x10
+        options.english_localization
+        or options.mode_drops_x10
         or options.alex_awakening
         or options.alex_rebalance
         or options.alex_heros_mark
