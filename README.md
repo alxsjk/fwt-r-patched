@@ -1,6 +1,6 @@
 # FWT Reborn - Offline Client Patcher & Modding Suite
 
-**Version 2.5.61** · [Changelog](CHANGELOG.md) · [Technical documentation](docs/SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md) · [Contributing](CONTRIBUTING.md)
+**Version 2.5.62** · [Changelog](CHANGELOG.md) · [Technical documentation](docs/SERVER_ARCHITECTURE_AND_REVERSE_ENGINEERING.md) · [Contributing](CONTRIBUTING.md)
 
 Cross-platform desktop application (**Windows & Linux**) in Python for applying deterministic patches directly to the offline Korean APK of Fantasy War Tactics (**0.682 v1574**), eliminating the need to compile a separate server when playing 100% offline on a phone or emulator with all quality-of-life enhancements enabled.
 
@@ -186,7 +186,7 @@ In the window:
 4. Connect your ADB device (Wi-Fi or USB):
    - For a Wi-Fi emulator (e.g., MEmu/MuMu at `192.0.2.10:5555`), click **Connect IP** and enter `IP:Port`.
 5. Click:
-   - **Generate Patched APK Only**: Builds `output/FWT-Reborn-Patched-<version>-release.apk` (for example `FWT-Reborn-Patched-2.5.61-release.apk`) for manual sideloading. No ZIP wrapper is generated.
+   - **Generate Patched APK Only**: Builds `output/FWT-Reborn-Patched-<version>-release.apk` (for example `FWT-Reborn-Patched-2.5.62-release.apk`) for manual sideloading. No ZIP wrapper is generated.
    - **Generate & Install via ADB**: Backs up the save, builds the 16 KB-aligned signed APK, verifies the output, and installs it onto the device.
    - **Restore Save JSON...**: Restores a save backup (requires root).
    - **Uninstall App (wipes data)**: Removes the installed package to resolve signature conflicts; back up your save first.
@@ -233,7 +233,7 @@ the result is unknown: check the device before retrying.
 #### 1. Inspect an APK:
 ```bash
 python fwt_patcher.py --inspect source/fwt_0.682_offline_v1574.apk
-python fwt_patcher.py --inspect output/FWT-Reborn-Patched-2.5.61-release.apk
+python fwt_patcher.py --inspect output/FWT-Reborn-Patched-2.5.62-release.apk
 ```
 
 #### 2. Inspect a standalone `.so`:
@@ -279,7 +279,7 @@ python fwt_patcher.py --all --lan 192.0.2.20:8010 --output output/FWT_LAN.apk
 python tools/create_distribution_zip.py
 ```
 The archive is written as `output/FWT-Reborn-Patcher-Suite-<version>.zip`
-(for example `FWT-Reborn-Patcher-Suite-2.5.61.zip`). Custom `--output` names
+(for example `FWT-Reborn-Patcher-Suite-2.5.62.zip`). Custom `--output` names
 without the current version receive it automatically. No APK-only ZIP is
 generated; use `--apk-only` to stage/copy the versioned APK instead.
 
@@ -516,7 +516,7 @@ selection, and reached the lobby with the embedded local server responding on
 | `Could not download apktool` | First build has no network and no local jar | Install apktool 3.0.3 and set `FWT_APKTOOL_JAR`, or allow access to the pinned GitHub release |
 | Bootstrap says *Resource installation verification failed* | The patched `equipselectlist.unity3d` hash in `classes8.dex` does not match the extracted file | Rebuild with 2.3.0+; the build rewrites the `HASHED_CRITICAL_FILES` constant (17 contract edits) and the resource contract together |
 | Bootstrap says *Resource size exceeds the expected limit* | APK has a patched `fwt_resources_v1.zip` but an old resource contract | Rebuild with 2.0.1+; do not mix a patched archive with a 2.0.0 `classes8.dex` |
-| Bootstrap, Shop, or Summon UI is Korean | Old build or `--english` not enabled | Rebuild with `--all`/`--english`; 2.5.61 translates bootstrap, Summon, Shop, mini-shops, server strings, and leftover English datatables |
+| Bootstrap, Shop, or Summon UI is Korean | Old build or `--english` not enabled | Rebuild with `--all`/`--english`; 2.5.62 translates bootstrap, Summon, Shop, mini-shops, server strings, and leftover English datatables |
 
 ---
 

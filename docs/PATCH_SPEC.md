@@ -20,7 +20,7 @@ and are no longer selectable in the CLI or GUI.
 - Added/changed: `gold_cylinder_x10`, `mana_cylinder_x10`; the client hooks for
   `single_gem_fang` (RVA `0x1DCACEC`) and the campaign/event shop client tables;
   `no_win_box` is now an unconditional bug fix.
-- The release line is still `--all` plus the numeric factors; at `2.5.35`, `--all` covered 50 active features. As of `2.5.61`, `--all` enables **69** selectable features (plus default 16 KB alignment and the 4 always-on `no_win_box`, `hero_exp_cap`, `convert_hex_guard`, and `dungeon_recom_info` fixes; see [FEATURE_CATALOG.md](FEATURE_CATALOG.md)).
+- The release line is still `--all` plus the numeric factors; at `2.5.35`, `--all` covered 50 active features. As of `2.5.62`, `--all` enables **69** selectable features (plus default 16 KB alignment and the 4 always-on `no_win_box`, `hero_exp_cap`, `convert_hex_guard`, and `dungeon_recom_info` fixes; see [FEATURE_CATALOG.md](FEATURE_CATALOG.md)).
 
 ## Original hero modifications (12.01–12.03)
 

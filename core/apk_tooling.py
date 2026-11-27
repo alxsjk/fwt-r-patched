@@ -2379,9 +2379,19 @@ def _patch_resources_zip_file(
                     if log_fn:
                         log_fn(f"Failed to patch {Path(info.filename).name}: {exc}")
 
-            elif info.filename == STRINGTABLE_EN_ASSET_PATH and options.english_localization:
+            elif info.filename in (
+                STRINGTABLE_EN_ASSET_PATH,
+                SHIPYARD_EN_ASSET_PATH,
+            ) and options.english_localization:
                 data = archive.read(info.filename)
+                label = Path(info.filename).name
+                patch_fn = (
+                    patch_stringtable_english_rows
+                    if info.filename == STRINGTABLE_EN_ASSET_PATH
+                    else patch_shipyarddata_english_rows
+                )
                 try:
+                    was_encrypted = not data.startswith(b"UnityFS")
                     clear, k, v = _decrypt_datatable(data)
                     env = UnityPy.load(clear)
                     changed = 0
@@ -2390,52 +2400,30 @@ def _patch_resources_zip_file(
                             continue
                         tree = obj.read_typetree()
                         rows = tree.get("_data") or []
-                        delta = patch_stringtable_english_rows(rows)
+                        delta = patch_fn(rows)
                         if delta:
                             obj.save_typetree(tree)
                             changed += delta
                     if changed:
                         new_clear = bytes(getattr(env.file, "save")(packer="original"))  # noqa: B009
-                        patched = _encrypt_datatable(new_clear, k, v)
+                        # Preserve original container format: stringtableenglish.unity3d is
+                        # shipped as plaintext UnityFS while shipyarddataenglish is AES-CBC.
+                        patched = (
+                            _encrypt_datatable(new_clear, k, v)
+                            if was_encrypted
+                            else new_clear
+                        )
                         if patched != data:
                             replacements[info.filename] = patched
                         if log_fn:
                             log_fn(
-                                f"Patched stringtableenglish.unity3d: {changed} leftover Korean row(s) translated"
+                                f"Patched {label}: {changed} row(s) translated "
+                                f"({'encrypted' if was_encrypted else 'plaintext UnityFS'})"
                             )
                 except Exception as exc:
-                    failures.append(f"stringtableenglish.unity3d: {exc}")
+                    failures.append(f"{label}: {exc}")
                     if log_fn:
-                        log_fn(f"Failed to patch stringtableenglish.unity3d: {exc}")
-
-            elif info.filename == SHIPYARD_EN_ASSET_PATH and options.english_localization:
-                data = archive.read(info.filename)
-                try:
-                    clear, k, v = _decrypt_datatable(data)
-                    env = UnityPy.load(clear)
-                    changed = 0
-                    for obj in env.objects:
-                        if obj.type.name != "MonoBehaviour":
-                            continue
-                        tree = obj.read_typetree()
-                        rows = tree.get("_data") or []
-                        delta = patch_shipyarddata_english_rows(rows)
-                        if delta:
-                            obj.save_typetree(tree)
-                            changed += delta
-                    if changed:
-                        new_clear = bytes(getattr(env.file, "save")(packer="original"))  # noqa: B009
-                        patched = _encrypt_datatable(new_clear, k, v)
-                        if patched != data:
-                            replacements[info.filename] = patched
-                        if log_fn:
-                            log_fn(
-                                f"Patched shipyarddataenglish.unity3d: {changed} repair label(s) translated"
-                            )
-                except Exception as exc:
-                    failures.append(f"shipyarddataenglish.unity3d: {exc}")
-                    if log_fn:
-                        log_fn(f"Failed to patch shipyarddataenglish.unity3d: {exc}")
+                        log_fn(f"Failed to patch {label}: {exc}")
 
             elif (
                 info.filename == MONSTER_DATA_CLIENT_ASSET_PATH

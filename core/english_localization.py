@@ -423,17 +423,22 @@ def inspect_english_localization_assets(inner_zip: zipfile.ZipFile) -> tuple[boo
 
     from core.apk_tooling import _decrypt_datatable
 
-    checks: list[tuple[str, Callable[[list[dict[str, Any]]], tuple[bool, str]]]] = [
-        (STRINGTABLE_EN_ASSET_PATH, inspect_stringtable_english_rows),
-        (SHIPYARD_EN_ASSET_PATH, inspect_shipyarddata_english_rows),
+    checks: list[tuple[str, bool, Callable[[list[dict[str, Any]]], tuple[bool, str]]]] = [
+        (STRINGTABLE_EN_ASSET_PATH, False, inspect_stringtable_english_rows),
+        (SHIPYARD_EN_ASSET_PATH, True, inspect_shipyarddata_english_rows),
     ]
     details: list[str] = []
-    for asset_path, fn in checks:
+    for asset_path, expect_encrypted, fn in checks:
         try:
             raw = inner_zip.read(asset_path)
         except KeyError:
             return False, f"{asset_path} missing from resource archive"
-        clear, _k, _v = _decrypt_datatable(raw)
+        is_plaintext = raw.startswith(b"UnityFS")
+        if expect_encrypted and is_plaintext:
+            return False, f"{asset_path} expected AES-encrypted bundle, found plaintext UnityFS"
+        if not expect_encrypted and not is_plaintext:
+            return False, f"{asset_path} must remain plaintext UnityFS (found encrypted/non-UnityFS)"
+        clear = raw if is_plaintext else _decrypt_datatable(raw)[0]
         env = UnityPy.load(clear)
         rows: list[dict[str, Any]] = []
         for obj in env.objects:

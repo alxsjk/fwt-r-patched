@@ -1,6 +1,6 @@
 # Grouped Feature Catalog
 
-This is the canonical index of GUI feature numbers for FWT Reborn Patch 2.5.61. The same IDs appear in the graphical interface. For code locations, byte sequences and validation history, see [PATCH_SPEC.md](PATCH_SPEC.md).
+This is the canonical index of GUI feature numbers for FWT Reborn Patch 2.5.62. The same IDs appear in the graphical interface. For code locations, byte sequences and validation history, see [PATCH_SPEC.md](PATCH_SPEC.md).
 
 IDs are stable references, not positions: never renumber or reuse an ID. If a feature moves to another group, keep its existing ID; its prefix identifies the group in which it was first assigned. Add new items with a new number in the relevant group and update `gui/feature_catalog.py` and this catalog together. The parity tests verify the mapping.
 

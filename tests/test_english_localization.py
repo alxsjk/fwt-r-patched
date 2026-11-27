@@ -19,7 +19,10 @@ from core.costume_packages import inspect_costume_packages
 from core.dex_smali import find_apktool_jar, find_java_executable
 from core.elf_mapping import read_load_segments, translate_vaddr
 from core.english_localization import (
+    SHIPYARD_EN_ASSET_PATH,
+    STRINGTABLE_EN_ASSET_PATH,
     apply_english_server_catalog,
+    inspect_english_localization_assets,
     inspect_english_server_catalog,
     inspect_shipyarddata_english_rows,
     inspect_stringtable_english_rows,
@@ -107,6 +110,19 @@ def test_stringtable_and_shipyard_helpers_idempotent_and_fail_closed() -> None:
     assert patch_shipyarddata_english_rows(sy_rows) == len(SHIPYARD_EN_FIXES)
     assert patch_shipyarddata_english_rows(sy_rows) == 0
     assert inspect_shipyarddata_english_rows(sy_rows)[0]
+
+
+def test_inspect_english_localization_assets_enforces_plaintext_stringtable(
+    tmp_path: Path,
+) -> None:
+    zpath = tmp_path / "res.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        zf.writestr(STRINGTABLE_EN_ASSET_PATH, b"NOT_UNITYFS_ENCRYPTED")
+        zf.writestr(SHIPYARD_EN_ASSET_PATH, b"encrypted")
+    with zipfile.ZipFile(zpath, "r") as zf:
+        ok, msg = inspect_english_localization_assets(zf)
+    assert not ok
+    assert "must remain plaintext UnityFS" in msg
 
 
 def test_boundary_split_arrays_decode_to_valid_json() -> None:

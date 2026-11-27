@@ -7,6 +7,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.5.62] - 2026-11-26
+
+### Fixed
+- **Preserve plaintext `UnityFS` format for `stringtableenglish.unity3d` (`08.01`, `--english`)**: in `2.5.61`, `core/apk_tooling.py` encrypted `stringtableenglish.unity3d` with AES-CBC after patching its 10 leftover Korean rows, even though the stock bundle is stored as unencrypted `UnityFS`. That caused the game client to reject the encrypted bundle and fall back to Korean `stringtable.unity3d` across server selection, lobby, and menus. Preserved plaintext `UnityFS` output for unencrypted datatables in `core/apk_tooling.py`, added a plaintext-container assertion in `core/english_localization.py` (`inspect_english_localization_assets()`), and covered it in `tests/test_english_localization.py`.
+
 ## [2.5.61] - 2026-11-26
 
 ### Added
