@@ -1,6 +1,6 @@
 # FWT Re-Patched — Technical Specification of Patches & Tooling
 
-> Living document. Last updated: 2026-11-25.
+> Living document. Last updated: 2026-11-26.
 >
 > Scope: Korean offline APK of Fantasy War Tactics **0.682 v1574**, embedded local
 > server (`libfwt_local_server.so`), IL2CPP client (`libil2cpp.so`), and DEX
@@ -361,8 +361,8 @@ Build & infrastructure fields on `PatchOptions` (not gameplay patches): `server_
   - **Boundary fragments (`JSON_BOUNDARY_PATCHES`, 44 entries)**: SHA-256-verified in-place replacements for every NUL-split JSON array across `.text` `std::string::append` chunks (including `0x215DE1` / `0x1DB35F` compatibility with `hero_shop_offers`) and 9-language event header arrays at `0x21C3ED` / `0x228C9F`.
   - **Small `.rodata` C++ strings (`RODATA_STR_PATCHES`, 796 entries)**: NUL-padded in-place replacements (Summon `Change Rotation` at `0x4D5C38`, rotation popup/timer, Tower of Dawn hints, missions, and event mails) within original UTF-8 byte budgets, preserving exact byte lengths for the 4 fixed-`memcpy` sites (`0x3EA282`, `0x3F16F4`, `0x40B370`, `0x547533`) and updating two ARM64 SSO instructions at `0xA4B17C`/`0xA4B184` for `0x466B4D` (`"5+ attempts"`).
 - Client datatables (`assets/fwt_resources_v1.zip`):
-  - `stringtableenglish.unity3d`: translates the **10** leftover Korean rows (`STRINGTABLE_EN_FIXES`).
-  - `shipyarddataenglish.unity3d`: translates the **4** leftover Korean repair labels (`SHIPYARD_EN_FIXES`).
+  - `stringtableenglish.unity3d`: translates the **10** leftover Korean rows (`STRINGTABLE_EN_FIXES`) while **preserving its unencrypted plaintext `UnityFS` container format** (`was_encrypted = not data.startswith(b"UnityFS")` in `core/apk_tooling.py`). The stock client stores `stringtableenglish.unity3d` unencrypted and silently falls back to Korean `stringtable.unity3d` if given an AES-encrypted bundle; `inspect_english_localization_assets()` explicitly verifies plaintext `UnityFS` header + empty-Korean rows.
+  - `shipyarddataenglish.unity3d`: translates the **4** leftover Korean repair labels (`SHIPYARD_EN_FIXES`) while preserving its AES-CBC container encryption.
   - Both update `ResourceContract` automatically.
 - DEX `classes8.dex` (smali rebuild through apktool 3.0.3):
   - Translates all **47 unique hard-coded Korean bootstrap strings** (51
