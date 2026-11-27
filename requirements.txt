@@ -35,5 +35,5 @@ rich==15.0.0
 typer==0.29.1
 click==8.5.1
 python-dotenv==1.2.4
-pydantic-settings==2.16.2
+pydantic-settings==2.16.3
 adbutils==2.12.0
