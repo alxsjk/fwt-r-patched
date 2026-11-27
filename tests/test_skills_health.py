@@ -114,6 +114,12 @@ def test_verification_gates_exclude_both_integration_and_slow() -> None:
 
 
 def test_governance_files_use_lf_and_contain_no_pii_or_lan_ips() -> None:
+    gitattributes_text = (PROJECT_ROOT / ".gitattributes").read_text(encoding="utf-8")
+    for entry in ("*.sh", "AGENTS.md", ".specify/**", ".agents/**"):
+        assert f"{entry} text eol=lf" in gitattributes_text, (
+            f".gitattributes must enforce 'text eol=lf' for {entry}"
+        )
+
     tracked_files = [
         *_tracked_fwt_skill_files(),
         CONSTITUTION_PATH,
